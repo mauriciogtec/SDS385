@@ -2,8 +2,8 @@
 title: "SDS 385 Stats Models for Big Data"
 subtitle: 'Solutions 01a: Mauricio Garcia Tec'
 output:
-  html_notebook: default
   html_document: default
+  html_notebook: default
 ---
 
 ```{r setup, include=FALSE}

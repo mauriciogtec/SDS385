@@ -123,63 +123,84 @@ $(document).ready(function () {
 
 <div id="part-i-linear-models" class="section level2">
 <h2>Part I : Linear Models</h2>
+<p><strong><em> Consider the simple linear regression model <span class="math display">\[
+y = X\beta + \epsilon
+\]</span> where <span class="math inline">\(y \in \mathbb{R}^N\)</span> is th vector of responses, and <span class="math inline">\(X\in \mathbb{R}^{N\times P}\)</span> a matrix of features whose <span class="math inline">\(i\)</span>-th row is <span class="math inline">\(x_i\)</span>, and <span class="math inline">\(\epsilon \in \mathbb{R}^N\)</span> is a vector of model residuals. The goal is to estimate the unknown parameter <span class="math inline">\(\beta\in\mathbb{R}^P\)</span>.</p>
+<p>Let’s say you trust the precision of some observations more than others, and therefore decide to estimate <span class="math inline">\(\beta\)</span> by the principle of weighted least squares (WLS): <span class="math display">\[
+\beta = \arg\min_{\beta\in\mathbb{R}^N} \sum_{i=1}^N (y_i - x_i^\top\beta)^2,
+\]</span> where <span class="math inline">\(w_i\)</span> is the weight for observation <span class="math inline">\(i\)</span>. </strong></em></p>
 <div id="a-analytic-solution" class="section level3">
-<h3>(A) Analytic solution</h3>
-<p>The objective function we want to minimise is <span class="math display">\[
-f(\beta) = \frac{1}{2}\sum_{i=1}^N w_i (y_i - x_i^\top\beta)^2
-\]</span> To search for a minimum of this convex function (complexity is a consequence of <span class="math inline">\(w_i&gt;0\)</span> for all <span class="math inline">\(i\)</span>), we only need a <span class="math inline">\(\hat{\beta}\)</span> that satisfies the first-order condition <span class="math display">\[
-\nabla_\beta f(\hat{\beta}) = 0
+<h3>(A) Analytic Solution</h3>
+<p><strong><em> Rewrite the WLS objective function above in terms of vectors and matrices, and show that <span class="math inline">\(\hat{\beta}\)</span> is the solution to the following linear system of <span class="math inline">\(P\)</span> equations in <span class="math inline">\(P\)</span> unknowns: <span class="math display">\[
+\left(X^\top W X\right)\hat{\beta} = X^\top W y
+\]</span> where <span class="math inline">\(W\)</span> is the diagonal matrix of weights. </strong></em></p>
+<p>The objective function we want to minimize is <span class="math display">\[
+f(\beta) = \frac{1}{2}\sum_{i=1}^N w_i (y_i - x_i^\top\beta)^2.
+\]</span> The function <span class="math inline">\(f\)</span> is a quadratic polynomial on <span class="math inline">\(\beta_1,...,\beta_P\)</span>, where the coefficient of <span class="math inline">\(\beta_i^2\)</span> is <span class="math inline">\(w_ix_i^\top x_i\)</span>. Since the <span class="math inline">\(w_i\)</span> are all positive, we already see that <span class="math inline">\(f\)</span> is a convex paraboloid. To find the minimum of this function, we only need a vector <span class="math inline">\(\hat{\beta}\)</span> satisfying first-order condition <span class="math display">\[
+\nabla_\beta f(\hat{\beta}) = 0.
 \]</span></p>
-<p>We will use matrix calculus to make this easier. To do this, the first step is to writerewrite <span class="math inline">\(f\)</span> using only matrix multiplications. The expression above is essentialy the <em>weighted</em> euclidean norm of <span class="math inline">\(y-X\beta\)</span>, that is <span class="math display">\[
+<p>We start by rewriting <span class="math inline">\(f\)</span> using only matrix multiplications: <span class="math display">\[
 \begin{aligned}
-f(\beta) &amp; = \frac{1}{2} \left(y - X\beta)^\top W(y-X\beta\right) \\ &amp; =
+f(\beta) &amp; = \frac{1}{2} \left\lVert W^{1/2} \left(y - X\beta\right) \right\rVert^2 \\ &amp;=
+\frac{1}{2} \left(y - X\beta)^\top W(y-X\beta\right) \\ &amp; =
 \frac{1}{2} \beta^\top X^\top W X \beta - y^\top W X  \beta + y^\top W y 
 \end{aligned}
-\]</span> The first equality is easy to check since the effect of multiplying <span class="math inline">\((y-X\beta)\)</span> by the diagonal matrix <span class="math inline">\(W\)</span> is to multiply each entry <span class="math inline">\(i\)</span> by <span class="math inline">\(w_i\)</span> obtaining <span class="math inline">\((y_i-x_i^\top\beta)\)</span>. For the second, we expand every matrix multiplication and use the symmetry of <span class="math inline">\(W\)</span> to group terms.</p>
-<p>The last expression above is a great candidate for matrix differentation, which we recall briefly</p>
+\]</span> where of course <span class="math inline">\(W^{1/2} = \mathrm{diag}(\sqrt{w_1},...,\sqrt{w_N})\)</span>. These identities are easily verified since the effect of multiplying a vector by a diagonal matrix is to take the product of each entry with the corresponding element in the diagonal. With the last expression, we have arrive to a position where we can comfortably use matrix differentation to solve the first-order conditions. Matrix differentiation is simply a convenient way of computing a gradient (entry-wise derivatives) in terms of vectors and matrices. We will use the following two formulas</p>
 <hr />
-<div id="matrix-differentation-recap" class="section level4">
-<h4>Matrix differentation Recap</h4>
-<p>Let’s do a super quick reminder of matrix derivation. There are just two important rules to remember</p>
+<div id="two-useful-formulas-in-matrix-differentiation" class="section level5">
+<h5>§ <em>Two useful formulas in Matrix Differentiation</em></h5>
+<p>Recall that for <span class="math inline">\(f:\mathbb{R}^n\to \mathbb{R}\)</span>, the gradient <span class="math inline">\(\nabla f:\mathbb{R}^n\to\mathbb{R}^n\)</span> is the function defined by the rule <span class="math display">\[
+\nabla_x f(x)=\left(\partial /\partial x_1 f(x), ..., \partial /\partial x_n f(x)\right)^\top,
+\]</span> the transpose here, usually omitted, serves to emphasize that the default is to have column vectors. The two rules we will use are:</p>
 <ol style="list-style-type: decimal">
-<li>If <span class="math inline">\(f(x) = x^\top A x\)</span> with <span class="math inline">\(x\in \mathbb{R}^N, A\in \mathbb{R}^{N\times N}\)</span> a <em>symmetric</em> matrix, then <span class="math inline">\(\nabla_x f(x) = 2Ax\)</span></li>
-<li>If <span class="math inline">\(f(x) = c^\top x\)</span> with <span class="math inline">\(c,x\in \mathbb{R}^N\)</span>, then <span class="math inline">\(\nabla_x f(x) = c\)</span></li>
+<li>If <span class="math inline">\(f(x) = x^\top A x\)</span> with <span class="math inline">\(A\in \mathbb{R}^{n\times n}\)</span> a <em>symmetric</em> matrix, then <span class="math inline">\(\nabla_x f(x) = 2Ax\)</span></li>
+<li>If <span class="math inline">\(f(x) = c^\top x\)</span> with <span class="math inline">\(c \in \mathbb{R}^n\)</span>, then <span class="math inline">\(\nabla_x f(x) = c\)</span></li>
 </ol>
-<p>The proof of these formulas is straight-forward by expanding all the multiplication and entry-wise differentiation.</p>
+<p>The proof of these formulas is a simple direct application of entry-wise differentiation after expanding the matrix multiplication.</p>
 <hr />
-<p>With the recap of matrix derivation we can derivate our weighted-least-squares. Essentially, the first term of the objective function can be derivated with the first matrix differentation formula, the second term with the second formula, and the third one goes to zero since it doesn’t depend on <span class="math inline">\(\beta\)</span>. Hence</p>
+<p>With the recap of matrix derivation we can derivate our weighted-least-squares. Essentially, the first term of the objective function can be derivated with the first matrix differentation formula, the second term with the second formula, and the third one goes to zero since it doesn’t depend on <span class="math inline">\(\beta\)</span>. Hence,</p>
 <p><span class="math display">\[
 \nabla_\beta f(\beta) = \left(X^\top W X \right)\beta -  X^\top W y
-\]</span> Thus, <span class="math inline">\(\nabla_\beta f(\hat{\beta}) = 0\)</span> if and only if <span class="math display">\[
-0 =\nabla_\beta f(\hat{\beta}) = \left(X^\top W X \right)\hat{\beta} -  X^\top W y
+\]</span> Thus, <span class="math display">\[
+\nabla_\beta f(\hat{\beta}) = 0 \quad \text{ if and only if } \quad
+\left(X^\top W X \right)\hat{\beta} -  X^\top W y = 0
 \]</span> or equivalently, <span class="math display">\[
- \left(X^\top W X\right) \hat{\beta} =  X^\top Wy
-\]</span></p>
+ \left(X^\top W X\right) \hat{\beta} =  X^\top Wy,
+\]</span> which is the desired expression as a system of linear equations. This system is often referred to as the system of <em>normal equations</em>.</p>
 </div>
 </div>
-<div id="b-how-to-solve-it" class="section level3">
-<h3>(B) How to solve it</h3>
-<p><strong>The fear: underflow/overflow</strong>. Computers deal with floating point finite arithmetic representations of numbers. Very small or large numbers can in arithmetic operations cause round-off errors in programming language. Underflow happens when a number is too small for the machine to handle, overflow is the opposite. Here is an example of overflow in R</p>
-<pre class="r"><code>10^1000 - 10^1000  # should be 0....</code></pre>
+<div id="b-computing-the-solution" class="section level3">
+<h3>(B) Computing the Solution</h3>
+<p><strong><em> One way to calculate <span class="math inline">\(\beta\)</span> is to: (1) recognize that, trivially, the solution to the above linear system must satisfy <span class="math inline">\(\beta = \left(X^\top W X\right)^{-1} X^\top Wy\)</span>; and (2) to calculate this directly, i.e. by inverting <span class="math inline">\(X^\top WX\)</span>. Let’s call this the “inversion method” for calculating the WLS solution.</p>
+<p>Numerically speaking, is the inversion method the fastest and most stable way to actually solve the above linear system? Do some independent sleuthing on this question. Summarize what you ﬁnd, and provide pseudo-code for at least one alternate method based on matrix factorizations—call it “your method” for short. (Note: our linear system is not a special ﬂower; whatever you discover about general linear systems should apply here.) </strong></em></p>
+<p><strong>The Fear: Floating-point Arithmetic</strong>. Numbers appearing in arithmetic computations can be accidentaly rounded-off for a variety of reasons. Computers represent numbers using the floating-point <em>mantissa</em> representation <span class="math display">\[
+\mathrm{significand}\times\mathrm{base}\times^\mathrm{exponent}
+\]</span> The most used standard is IEEE-754, which uses a binary base. A number with an infinite representation in binary form can cause roundoff problems. In addition to the binary representation, other commong issues are</p>
+<ul>
+<li>Number too small for the computer to distinguish from zero (underflow)</li>
+<li>Number too large for the computer to distinguish from infinity (overflow)</li>
+</ul>
+<p>Here is an example of rouding errors due to <em>problems with binary number representation</em></p>
+<pre class="r"><code>1*(.5-.4-.1) # should be zero....</code></pre>
+<pre><code>## [1] -2.775558e-17</code></pre>
+<p>This is an example of <em>overflow</em></p>
+<pre class="r"><code>10^1000 - 10^1000  # should be zero...</code></pre>
 <pre><code>## [1] NaN</code></pre>
-<p>Unnecessarily inverting a matrix is one of the the biggest sins in computation. Many times we only need the solution, and fully computing the inverse of a matrix is not only innefficient, but the extra operation can actually cause many more round-off errors. Here’s a list of famous disasters caused by round-off errors: <a href="http://ta.twi.tudelft.nl/users/vuik/wi211/disasters.html">link</a>.</p>
-<p>Personally, in my real working experience, I encountered one case of a published R package that presented errors and did not work propery with my data. After investigating their code, I realised the cause was a matrix inversion. I used the singular value descomposition instead, and the problem was compleltely solves.</p>
-<p><strong>The problem: ill systems</strong>. My favourite way to see this is using the concept of <em>condition number</em> of a matrix and relate it to the variance of our independent variables. At least in R, often when an algorithm fails due to matrix inversion, we see a warning saying something like <code>matrix is ill-conditioned</code>. The concept of ill-conditioning is present in any basic Numerical Analysis textbook. Here is my personal ay to derive it</p>
+<p>Here’s a list of famous disasters caused by round-off errors: <a href="http://ta.twi.tudelft.nl/users/vuik/wi211/disasters.html">link</a>.</p>
+<p><strong>Our Problem: Ill Systems</strong>. Unnecessarily inverting a matrix is often considered as one of the the biggest sins in computation. Many times we only need the solution of a linear system, and fully computing the inverse of a matrix is not only innefficient, but the extra operation can actually cause many more round-off errors. This is particularly true for normal equations of the least square problem.</p>
+<p>When I worked as a statistical consultant, I once encountered an R package for Item Response Theory that yielded only errors for our data. After investigating the package’s code, I realized that error’s cause was the solution of a linear system by matrix inversion. I decided to use the singular value descomposition instead, and the package started to work as expected.</p>
+<p>Before discussing the specific case of Least Squares, I would like to introduce the general concept of <em>condition number</em> of a matrix, which is a measure of how problematic a linear system with that matrix would be, in the sense of the distortion in a solution by possible small errors.</p>
 <hr />
-<div id="condition-number-recap" class="section level4">
-<h4>Condition Number Recap</h4>
+<div id="condition-number" class="section level5">
+<h5>§ <em>Condition Number</em></h5>
 <p>Let’s situate ourselves in the context of trying to solve a system of linear equations <span class="math display">\[
 Ax = b.
-\]</span> We will assume that <span class="math inline">\(A\)</span> is invertible and thus a <em>unique</em> solution <span class="math inline">\(x = A^{-1}b\)</span> exists.</p>
-<p>An interesting quantity would be to see what happens to the solution <span class="math inline">\(x\)</span> as a small perturbation <span class="math inline">\(\epsilon\)</span> occurs in <span class="math inline">\(b\)</span>. Say, we replace <span class="math inline">\(b\)</span> for <span class="math inline">\(\tilde{b} = b + \epsilon\)</span>. We can think of this perturbation as a round-off or measurement error.</p>
-<p>The <em>change in the solution</em> is <span class="math display">\[A^{-1}(b+\epsilon) - A^{-1}b = A^{-1}\epsilon.\]</span></p>
-<p>Thus, the <em>relative change in the solution</em> is <span class="math display">\[
+\]</span> We assume that <span class="math inline">\(A\in \mathbb{R}^{n\times n}\)</span> is invertible and thus a <em>unique</em> solution <span class="math inline">\(x = A^{-1}b\)</span> exists.The purpose of the condition number <span class="math inline">\(\kappa(A)\)</span> will be to measure what can happen to the solution <span class="math inline">\(x\)</span> as a small perturbation <span class="math inline">\(\epsilon\)</span> occurs in <span class="math inline">\(b\)</span>.</p>
+<p>We will start by replacing <span class="math inline">\(b\)</span> for <span class="math inline">\(\tilde{b} = b + \epsilon\)</span>. We think of <span class="math inline">\(\epsilon\)</span> as a perturbation that can arise from round-off error as discussed in the previous section. The <em>change in the solution</em> is <span class="math display">\[A^{-1}\tilde{b}- A^{-1}b = A^{-1}\epsilon.\]</span> The <em>magnitude</em> of the solution error <em>relative</em> to the input term <span class="math inline">\(b\)</span> is <span class="math display">\[
 \frac{|\text{newsolution - solution}|}{|\text{solution}|} = \frac{\lVert A^{-1}\epsilon \lVert}{\lVert A^{-1}b\rVert}
-\]</span> We would like to compare this quantity with the <em>relative size of the error</em> <span class="math inline">\(\epsilon\)</span>, that is, the error in the input <span class="math display">\[
-\frac{\lVert\tilde{b} - b\rVert}{\lVert b\rVert} = \frac{\lVert\epsilon\rVert}{\lVert b\rVert}
-\]</span> Numerical analysis came with the idea thtat comparing these two quantities is useful: knowing how much an error in the input <span class="math inline">\(b\)</span> (in relative form) affects the output (again, in relative form). Whence, we are interested in the ratio <span class="math display">\[
+\]</span> We would like to compare this quantity with the <em>relative size of the error</em> <span class="math inline">\(\epsilon\)</span>, that is, we want to know the ratio <span class="math display">\[
 \frac{\frac{\lVert A^{-1}\epsilon \lVert}{\lVert A^{-1}b\rVert}}{ \frac{\lVert\epsilon\rVert}{\lVert b\rVert}} = \left(\frac{\lVert A^{-1}\epsilon\rVert}{\lVert\epsilon\rVert}\right)\left(\frac{\lVert b\rVert}{\lVert A^{-1}b\rVert}\right)
-\]</span> The <strong>condition number</strong> <span class="math inline">\(\kappa(A)\)</span> of the matrix <span class="math inline">\(A\)</span> is defined is the maximum value that the above ratio of errors can take. Is the maximum distorsion relative to the size of the distortion for any input. Mathematically, <span class="math display">\[
+\]</span> The <em>condition number</em> <span class="math inline">\(\kappa(A)\)</span> is defined is the maximum value that the above ratio of errors can take. Mathematically, <span class="math display">\[
 \begin{aligned}
 \kappa(A) &amp;= \max_{b,\epsilon \neq 0} \left(\frac{\lVert A^{-1}\epsilon\rVert}{\lVert\epsilon\rVert}\right)\left(\frac{\lVert b\rVert}{\lVert A^{-1}b\rVert}\right) \\
 &amp;=  \max_{b,\epsilon \neq 0}  \left\lVert A^{-1} \frac{\epsilon}{\lVert\epsilon\rVert} \right\rVert  \left\lVert A^{-1} \frac{b}{\lVert b\rVert} \right\rVert^{-1}  \\
@@ -187,31 +208,43 @@ Ax = b.
 &amp;=  \max_{\lVert \epsilon \rVert =1 }  \left\lVert A^{-1} \epsilon \right\rVert
 \min_{\lVert b \rVert =1} \left\lVert A^{-1} b \right\rVert
 \end{aligned}
-\]</span> The last expression is really pretty to work with. The quantity <span class="math inline">\(\max_{\lVert \epsilon \rVert =1 } \left\lVert A^{-1} \epsilon \right\rVert\)</span> is known as the induced 2-norm of <span class="math inline">\(A^{-1}\)</span>. This is a well known maximisation problem to this maximisation problem and the maximising argument is the maximum singular value of <span class="math inline">\(A^{-1}\)</span>. This is in fact how the singular value decomposition (SVD) of a matrix is actually constructed, by solving these max problems. Also, we check that the highest singular value of <span class="math inline">\(A^{-1}\)</span> is the reciprocal of the smallest singular value of <span class="math inline">\(A\)</span>. And similarly, the solution ot the minimisation problem is the reciprocal of the maximum singular value of <span class="math inline">\(A\)</span>. In conclusion</p>
-<p><span class="math display">\[
-\max_{\lVert \epsilon \rVert =1 }  \left\lVert A^{-1} \epsilon \right\rVert = \frac{1}{\sigma_{\text{min}}} \quad \text{and}  \quad
-\min_{\lVert \epsilon \rVert =1 }  \left\lVert A^{-1} \epsilon \right\rVert = \frac{1}{\sigma_{\text{max}}} 
-\]</span> where <span class="math inline">\(\sigma_{\text{min}}\)</span> and <span class="math inline">\(\sigma_{\text{max}}\)</span> are the minumum and maximum eigenvalues of <span class="math inline">\(A\)</span>. Finally <span class="math display">\[
-\kappa(A) = \frac{\sigma_{\text{max}}}{\sigma_{\text{min}}}
-\]</span> Observe that a matrix with very small value of <span class="math inline">\(\sigma_{\text{min}}\)</span> will have a huge condition number. Singular matrices, in particular, have <span class="math inline">\(\sigma_{\text{min}}= 0\)</span>. In general, the more “not” invertible the Matrix is, the smaller the eigenvalues will be and the bigger this relative error will be. This ends the recap.</p>
+\]</span> The condition number is related to the concept of <em>singular values</em> (and hence with the singular value decomposition). For those less familar with the concept of singular values, we can take the following identities as a definition the maximum singular value <span class="math inline">\(\sigma_\max\)</span> and minimal singular value of <span class="math inline">\(\sigma_\min\)</span>: <span class="math display">\[
+\max_{\lVert v \rVert =1 }  \left\lVert A v \right\rVert = \sigma_\max(A) \quad \text{and}  \quad
+\min_{\lVert v \rVert =1 }  \left\lVert A v \right\rVert = \sigma_\min(A).
+\]</span> The following identities are very easy to verify from the above <span class="math display">\[
+\sigma_\max(A) = \sigma_\min(A^{-1}) \quad \text{ and } \quad 
+\sigma_\min(A) = \sigma_\max(A^{-1})
+\]</span> This leads to the most common way of writing the condition number <span class="math display">\[
+\kappa(A) = \frac{\sigma_\max(A)}{\sigma_\min(A)}
+\]</span> Observe that a matrix with a small value of <span class="math inline">\(\sigma_{\text{min}}\)</span> will have a huge condition number, and this occurs when the columns of <span class="math inline">\(A\)</span> are close to be linearly dependent. The extreme case happens if <span class="math inline">\(A\)</span> has linearly dependent columns (and thus a non-trivial kernel); in this case <span class="math inline">\(\sigma_\min=0\)</span>, and the condition number is infinite.</p>
+<p>The lowest value that the condition number can take is <span class="math inline">\(\kappa(A)=1\)</span>. Using the last expression of condition number in terms of singular values, we can actually define it for any matrix, since the singular values always exist.</p>
 <hr />
-<p><strong>Effect of the condition number in a statistical model</strong>. The reason I wanted to argue in terms of the condition number, is because it helps to analyse what’s wrong with the system <span class="math display">\[
- \left(X^\top W X\right) \hat{\beta} =  X^\top Wy
-\]</span> namely, if <span class="math inline">\(X^\top W X\)</span> has a large condition number, then our solution <span class="math inline">\(\hat{\beta}\)</span> could blow up by small measurement errors on the right term. Of course, we expect our data to have random variations, in fact this is part of our model.</p>
-<p><strong>Why can <span class="math inline">\(X^\top W X\)</span> be super ill-conditioned?</strong>. Let’s suppose that <span class="math inline">\(X\)</span> is a centered (with respect to <span class="math inline">\(W\)</span>). That is, we’ll assume <span class="math display">\[
-\sum_{i=1}^Nw_ix_i^j = 0
-\]</span> for every column <span class="math inline">\(x^j=(x_1^j, ..., x_N^j)\)</span> of <span class="math inline">\(X\)</span>. In this case <span class="math display">\[
-\frac{1}{N} X^\top W X  \approx \text{Var}(X)
-\]</span> Indeed, <span class="math inline">\(\frac{1}{N} X^\top W X\)</span> is an (slightly biased but consistent) estimator of the variables <span class="math inline">\(x^1, x^2, ...\)</span> (assuming the sample weight of the individual <span class="math inline">\(i\)</span> is <span class="math inline">\(w_i\)</span> of course).</p>
-<p>The point I want to make, is that the more correlated the variables <span class="math inline">\(X\)</span> are, the more likely that <span class="math inline">\(X^\top W X\)</span> will be ill-conditiones, since the variance matrix of correlated variables is not invertible. The argument for non-centered variables follows from this one, there’s not much added complexity.</p>
-<p>One thing that happens often is that the values are extremely correlated and the computer, due to a round-off error yields <span class="math inline">\(X^\top W X\)</span> not invertible. This is called the <em>muticorrelation problem</em> in statistics. The computer will simply refuse to invert</p>
-<p><strong>What should we do then? Matrix factorization and Efficiency</strong>. The problem will remain ill-conditioned no matter the method, that’s a fact. But some methods make unnecessiry multiplications, potentially introducing more perturbation along the way. Doing less operations can be good not only in time, but protection agains errors. The traditional ethod of inverting a matrix is the full Gauss method. Many methods use the same spirit but stop along the way and to a partial factorization of a matrix, instead of fully inverting it. This partial factorization allows to solve the system more efficiently. Here’s the some of the most famous for solving <span class="math inline">\(Ax=b\)</span></p>
-<table style="width:97%;">
+<p><strong>The Condition Number in a Least Squares Problem</strong>. The reason I wanted to argue in terms of the condition number, is because it helps to analyse what’s wrong with the system <span class="math display">\[
+ \left(X^\top W X\right) \hat{\beta} =  X^\top Wy.
+\]</span> If <span class="math inline">\(X^\top W X\)</span> has a large condition number, then our solution <span class="math inline">\(\hat{\beta}\)</span> could blow up due to small round-off errors. <em>But why can it be be super ill-conditioned?</em> To answer this, let us restrict ourselves to the case where <span class="math inline">\(W\)</span> the identity matrix <span class="math inline">\(I_N\)</span>. It is very easy to extend the discussion to the general case by noting that the system we are trying to solve is equivalent to <span class="math display">\[
+ \left(\tilde{X}^\top  \tilde{X}\right) \hat{\beta} =  \tilde{X}^\top\tilde{y}.
+\]</span> with <span class="math inline">\(\tilde{X} = W^{1/2}X\)</span> and <span class="math inline">\(\tilde{y} = W^{1/2}y\)</span>, so the weighted case is equivalent to the non-weighted case after a simple rescaling. Again, I will drop the notation of tildes to simplify presentation (and writing).</p>
+<p>Here’s the reason: the columns of our matrix <span class="math inline">\(X\)</span> represent our variables, which in many cases, have a strong linear dependency, that we statisticians call <em>high correlation</em>. Indeed, <span class="math inline">\(X\)</span> will not have full rank if one variable is a combination of the others, making <span class="math inline">\(X^\top X\)</span> not invertible.</p>
+<p>If the variables in our data are highly correlated, then the ill-conditioning effect will propagate to our solution in a squared way! This is because the singular values of <span class="math inline">\(X^\top X\)</span> are the square of the singular values of <span class="math inline">\(X\)</span>. There are many ways to see this, but the easiest is using the singular value decomposition of <span class="math inline">\(X\)</span>. Namely, if <span class="math display">\[
+X = UD V^\top
+\]</span> with <span class="math inline">\(U\)</span> and <span class="math inline">\(V\)</span> orthogonal matrices and <span class="math inline">\(D\)</span> a quasi-diagonal matrix containing the singular values of <span class="math inline">\(X\)</span> in the diagonal and with a block of zeros attached to match the dimensions of <span class="math inline">\(U\)</span> and <span class="math inline">\(V\)</span>; then <span class="math display">\[
+X^\top X = (U D V^\top)^\top (U D V^\top) = V D^\top D V^\top.
+\]</span> This is the singular value decomposition of <span class="math inline">\(X^\top X\)</span> (in fact the spectral decomposition too), and assuming <span class="math inline">\(N &gt; P\)</span>, then <span class="math inline">\(D^\top D\)</span> is a diagonal matrix whose entries are the squares of the singular values of <span class="math inline">\(X\)</span>, which happen to be the eigenvalues/singular values of <span class="math inline">\(X^\top X\)</span>. From this we conclude that <span class="math display">\[
+\kappa(X^\top X) = \left( \kappa(X) \right)^2.
+\]</span> This is why least squares can be extremely ill-conditioned with highly-correlated data.</p>
+<p><strong>What should we do then? Matrix factorization and Efficiency</strong>. The problem will remain ill-conditioned no matter the method, that’s a fact. But some methods make unnecessiry multiplications, potentially introducing more perturbation along the way. Doing less operations can be good not only in time, but protection agains errors. The traditional ethod of inverting a matrix is the full Gauss method. Many methods use the same spirit but stop along the way and to a partial factorization of a matrix, instead of fully inverting it. This partial factorization allows to solve the system more efficiently. Furthermore, some solution methods will avoid passing through <span class="math inline">\(X^\top X\)</span>, solving a system with condition number <span class="math inline">\(\kappa(X)\)</span>. Before explaining how the methods are used for the Least Squares problem, I present an overall review table of matrix factorization methods for solving linear systems of equations.</p>
+<hr />
+</div>
+<div id="matrix-factorization-methods-for-solving-linear-systems" class="section level5">
+<h5><em>§ Matrix Factorization Methods for solving Linear Systems</em></h5>
+<p>Here are the some of the most popular for solving <span class="math inline">\(Ax=b\)</span> with <span class="math inline">\(A \in \mathbb{R}^{n\times n}\)</span>:</p>
+<table>
 <colgroup>
-<col width="13%"></col>
-<col width="18%"></col>
-<col width="38%"></col>
-<col width="26%"></col>
+<col width="9%"></col>
+<col width="14%"></col>
+<col width="31%"></col>
+<col width="23%"></col>
+<col width="20%"></col>
 </colgroup>
 <thead>
 <tr class="header">
@@ -219,41 +252,49 @@ Ax = b.
 <th align="center">Efficiency</th>
 <th>Explanation</th>
 <th>Comment</th>
+<th>Algorithm</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td>Matrix Inversion</td>
 <td align="center"><span class="math inline">\(\approx 2 n^3\)</span></td>
-<td>Full Gaussian Elimination to obtain <span class="math inline">\(A^{-1}\)</span> and then compute <span class="math inline">\(x=A^{=1}b\)</span>.</td>
-<td>Triangular systems are supper easy and safe to solve</td>
+<td>Full Gaussian Elimination to obtain <span class="math inline">\(A^{-1}\)</span> and then compute <span class="math inline">\(x=A^{=1}b\)</span></td>
+<td>Unnecessary computations if the actual inverse is not needed</td>
+<td>Gaussian Elimination (usually LU) with extra inversion steps</td>
 </tr>
 <tr class="even">
-<td>LU</td>
+<td>LU decomposition</td>
 <td align="center"><span class="math inline">\(\approx \frac{2}{3} n^3\)</span></td>
-<td>Finds <span class="math inline">\(A=LU\)</span> with <span class="math inline">\(L\)</span> and <span class="math inline">\(U\)</span> lower and upper triangular respectively</td>
-<td>Triangular systems are supper easy and safe to solve</td>
+<td>Finds <span class="math inline">\(A=LU\)</span> with <span class="math inline">\(L\)</span> and <span class="math inline">\(U\)</span> lower and upper triangular respectively; after that solves <span class="math inline">\(Lz = b\)</span> and then <span class="math inline">\(Ux = z\)</span></td>
+<td>Triangular systems are efficient and easy to solve</td>
+<td>Gaussian Elimination</td>
 </tr>
 <tr class="odd">
-<td>QR</td>
+<td>QR factorization</td>
 <td align="center"><span class="math inline">\(\approx \frac{4}{3} n^3\)</span></td>
-<td>Finds <span class="math inline">\(A=QR\)</span> with <span class="math inline">\(Q\)</span> orthogonal and <span class="math inline">\(R\)</span> upper triangular respectively</td>
-<td>Better for some cases, orthogonal matrices have <span class="math inline">\(Q^{-1} = Q^\top\)</span>, this makes them handy</td>
+<td>Finds <span class="math inline">\(A=QR\)</span> with <span class="math inline">\(Q\)</span> orthogonal and <span class="math inline">\(R\)</span> upper triangular respectively; then solve triangular system <span class="math inline">\(Rx = Q^\top b\)</span></td>
+<td>Better for some cases, note that we are using that <span class="math inline">\(Q^{-1} = Q^\top\)</span></td>
+<td>Householder reflections</td>
 </tr>
 <tr class="even">
 <td>SVD</td>
 <td align="center"><span class="math inline">\(\approx 13n^3\)</span></td>
 <td>Finds <span class="math inline">\(A=USV^\top\)</span> with <span class="math inline">\(U\)</span> and <span class="math inline">\(V\)</span> orthogonal and <span class="math inline">\(S\)</span> diagonal with non-negative entries</td>
-<td>It has the safest properties, the cornerstone of linear algebra, but very efficient</td>
+<td>It has the safest properties, the cornerstone of linear algebra, but slow</td>
+<td>QR Algorithm (is not the same as QR factorization, but related)</td>
 </tr>
 <tr class="odd">
-<td>Cholesky</td>
+<td>Cholesky factorization</td>
 <td align="center"><span class="math inline">\(\approx \frac{1}{3}n^3\)</span></td>
-<td>Finds <span class="math inline">\(A=LL^\top\)</span> where <span class="math inline">\(L\)</span> is lower triangular</td>
+<td>Finds <span class="math inline">\(A=LL^\top\)</span> where <span class="math inline">\(L\)</span> is lower triangular; after that solves <span class="math inline">\(Lz = b\)</span> and then <span class="math inline">\(L^\top x = z\)</span></td>
 <td>It only works if <span class="math inline">\(A\)</span> is symmetric positive semidefinite as in our case <span class="math inline">\(X^\top X\)</span></td>
+<td>Cholesky Algorithm</td>
 </tr>
 </tbody>
 </table>
+<p>These methods are described thoroughly in any Numerical Analysis book.</p>
+<hr />
 <p><strong>Ok, so which one to use for WLS? </strong>. From the above, the LU decomposition is rearly used because it requires computing <span class="math inline">\(X^\top WX\)</span> directly, and in this case the Cholesky decomposition is usually better. In order to know which one is preferred, we need to consider the stability of its method.</p>
 <p>The table above shows that the most efficient method is the Cholesky decomposition. But there’s a catch: having to compute <span class="math inline">\(X^\top WX\)</span> squares the condition number (easy to check using the SVD decomposition), so it is actually unstable for ill-conditiones systems.</p>
 <p><em>Conclusion</em>. It basically boils down to choosing between Cholesky, SVD and QR, here’s a comparison.</p>
@@ -413,10 +454,10 @@ microbenchmark(
   times=100L
 )</code></pre>
 <pre><code>## Unit: microseconds
-##                    expr    min      lq     mean  median      uq     max
-##  inv_fit(X, y, weights) 24.871 29.6070 34.23797 32.7650 37.1075 114.875
-##  wls_fit(X, y, weights) 74.215 83.6890 92.18044 90.0050 95.9265 166.983
-##  lm.wfit(X, y, weights) 45.792 52.5035 59.30896 57.6355 62.3725  99.479
+##                    expr    min      lq     mean  median       uq     max
+##  inv_fit(X, y, weights) 24.476 29.6075 34.74723 33.5550  38.8845  51.319
+##  wls_fit(X, y, weights) 75.005 85.6630 99.12019 90.7945 101.0580 232.907
+##  lm.wfit(X, y, weights) 47.766 55.4640 62.34460 60.2015  67.1090 103.822
 ##  neval
 ##    100
 ##    100
@@ -604,29 +645,64 @@ sigma &lt;- .01 # error size
 N &lt;- 1e4
 d &lt;- 1e3
 X &lt;- Matrix(
-  data = rnorm(N * d) * rbinom(N * d, 1, 0.05),
+  data = rnorm(N * d) * rbinom(N * d, 1, 0.01),
   nrow = N,
   sparse = TRUE
 )
 X[1:5, 1:10] # sample view of X</code></pre>
 <pre><code>## 5 x 10 sparse Matrix of class &quot;dgCMatrix&quot;
-##                                            
-## [1,] .  .         .  .          . . . . . .
-## [2,] .  .         . -0.04798538 . . . . . .
-## [3,] .  .         .  .          . . . . . .
-## [4,] . -0.7323038 .  .          . . . . . .
-## [5,] .  .         .  .          . . . . . .</code></pre>
+##                                 
+## [1,] . . . . . . . . .  .       
+## [2,] . . . . . . . . .  .       
+## [3,] . . . . . . . . .  .       
+## [4,] . . . . . . . . .  .       
+## [5,] . . . . . . . . . -0.434354</code></pre>
 <pre class="r"><code>str(X)</code></pre>
 <pre><code>## Formal class 'dgCMatrix' [package &quot;Matrix&quot;] with 6 slots
-##   ..@ i       : int [1:499800] 5 19 63 72 84 87 132 152 189 214 ...
-##   ..@ p       : int [1:1001] 0 512 976 1505 1985 2464 2922 3379 3858 4357 ...
+##   ..@ i       : int [1:100000] 188 317 405 534 562 578 630 789 831 963 ...
+##   ..@ p       : int [1:1001] 0 118 210 316 402 503 595 686 794 899 ...
 ##   ..@ Dim     : int [1:2] 10000 1000
 ##   ..@ Dimnames:List of 2
 ##   .. ..$ : NULL
 ##   .. ..$ : NULL
-##   ..@ x       : num [1:499800] 2.034 0.41 -0.101 0.115 0.651 ...
+##   ..@ x       : num [1:100000] 0.258 -0.754 -0.835 1.127 1.749 ...
 ##   ..@ factors : list()</code></pre>
 <p>We see above that the rows and columns are stores in the fields <code>i</code> and <code>p</code> of this object; the values are stored in the property <code>x</code>.</p>
+<p><strong>Methods for sparse matrices</strong>. We will now write a few methods for sparse matrices. Basically, we will give the sparse versions of the previous methods.</p>
+<pre class="r"><code>sparse_qr_fit &lt;- function(sparseX, y, weights) {
+  stopifnot(inherits(sparseX, &quot;sparseMatrix&quot;)) # check if X is sparse
+  N &lt;- nrow(sparseX)
+  # 1: Adjust for weights
+  Xtilde &lt;- sparseX * sqrt(weights) # Xtilde is sparse!
+  ytilde &lt;- y * sqrt(weights)
+  # 2: (Q-less) QR decomposition
+  qrdecomp &lt;- qr(Xtilde)
+  R &lt;- qrR(qrdecomp) # base qr fun is odd, qr.R recovers R from the odd form of qr
+  # 3: Get RHS of linear system
+  b &lt;- crossprod(Xtilde, ytilde)
+  # 4. Solve Step 1 of system
+  z &lt;- solve(t(R), b) # formal class system signature chooses forward solve automatically
+  # 5. Solve Step 2 of system
+  beta &lt;- solve(R, z) # formal class system signature chooses backward solve automatically
+  # Output
+  as.numeric(beta)
+}</code></pre>
+<pre class="r"><code>beta &lt;- rnorm(d)
+err &lt;- rnorm(N, 0, .01)
+y &lt;- X %*% beta + err
+weights &lt;- rep(1, N)
+microbenchmark(
+  wls_fit(as.matrix(X), y, weights),
+  sparse_qr_fit(X, y, weights),
+  times = 2L
+)</code></pre>
+<pre><code>## Unit: seconds
+##                               expr       min        lq      mean    median
+##  wls_fit(as.matrix(X), y, weights)  3.874826  3.874826  4.098266  4.098266
+##       sparse_qr_fit(X, y, weights) 11.517893 11.517893 11.837017 11.837017
+##         uq       max neval
+##   4.321706  4.321706     2
+##  12.156141 12.156141     2</code></pre>
 </div>
 </div>
 

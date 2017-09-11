@@ -1,0 +1,596 @@
+---
+title: "SDS 385 Stats Models for Big Data"
+subtitle: 'Solutions 01a: Mauricio Garcia Tec'
+output:
+  html_notebook: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = FALSE)
+```
+
+
+## Part I : Linear Models
+
+<strong><em>
+Consider the simple linear regression model
+$$
+y = X\beta + \epsilon
+$$
+where $y \in \mathbb{R}^N$ is th vector of responses, and $X\in \mathbb{R}^{N\times P}$ a matrix of features whose $i$-th row is $x_i$, and $\epsilon \in \mathbb{R}^N$ is a vector of model residuals. The goal is to estimate the unknown parameter $\beta\in\mathbb{R}^P$.
+
+Let's say you trust the precision of some observations more than others, and therefore decide to estimate $\beta$ by the principle of weighted least squares (WLS):
+$$
+\beta = \arg\min_{\beta\in\mathbb{R}^N} \sum_{i=1}^N (y_i - x_i^\top\beta)^2,
+$$
+where $w_i$ is the weight for observation $i$.
+</strong></em>
+
+
+### (A) Analytic Solution
+
+<strong><em>
+Rewrite the WLS objective function above in terms of vectors and matrices, and show that $\hat{\beta}$ is the solution to the following linear system of $P$ equations in $P$ unknowns:
+$$
+\left(X^\top W X\right)\hat{\beta} = X^\top W y
+$$
+where $W$ is the diagonal matrix of weights.
+</strong></em>
+
+
+The objective function we want to minimize is 
+$$
+f(\beta) = \frac{1}{2}\sum_{i=1}^N w_i (y_i - x_i^\top\beta)^2.
+$$
+The function $f$ is a quadratic polynomial on $\beta_1,...,\beta_P$, where the coefficient of $\beta_i^2$ is $w_ix_i^\top x_i$. Since the $w_i$ are all positive, we already see that $f$ is a convex paraboloid. To find the minimum of this function, we only need a vector $\hat{\beta}$ satisfying first-order condition
+$$
+\nabla_\beta f(\hat{\beta}) = 0.
+$$
+
+We start by rewriting $f$ using only matrix multiplications:
+$$
+\begin{aligned}
+f(\beta) & = \frac{1}{2} \left\lVert W^{1/2} \left(y - X\beta\right) \right\rVert^2 \\ &=
+\frac{1}{2} \left(y - X\beta)^\top W(y-X\beta\right) \\ & =
+\frac{1}{2} \beta^\top X^\top W X \beta - y^\top W X  \beta + y^\top W y 
+\end{aligned}
+$$
+where of course $W^{1/2} = \mathrm{diag}(\sqrt{w_1},...,\sqrt{w_N})$. These identities are easily verified since the effect of multiplying a vector by a diagonal matrix is to take the product of each entry with the corresponding element in the diagonal. With the last expression, we have arrive to a position where we can comfortably use matrix differentation to solve the first-order conditions. Matrix differentiation is simply a convenient way of computing a gradient (entry-wise derivatives) in terms of vectors and matrices. We will use the following two formulas
+
+-----------------------------------
+
+##### &sect; *Two useful formulas in Matrix Differentiation*
+
+Recall that for $f:\mathbb{R}^n\to \mathbb{R}$, the gradient $\nabla f:\mathbb{R}^n\to\mathbb{R}^n$ is the function defined by the rule 
+$$
+\nabla_x f(x)=\left(\partial /\partial x_1 f(x), ..., \partial /\partial x_n f(x)\right)^\top,
+$$
+the transpose here, usually omitted, serves to emphasize that the default is to have column vectors. The two rules we will use are:
+
+
+1. If $f(x) = x^\top A x$ with $A\in \mathbb{R}^{n\times n}$ a *symmetric* matrix, then $\nabla_x f(x) = 2Ax$
+2. If $f(x) = c^\top x$ with $c \in \mathbb{R}^n$, then $\nabla_x f(x) = c$
+
+The proof of these formulas is a simple direct application of entry-wise differentiation after expanding the matrix multiplication.
+
+-----------------------------------
+
+
+With the recap of matrix derivation we can derivate our weighted-least-squares. Essentially, the first term of the objective function can be derivated with the first matrix differentation formula, the second term with the second formula, and the third one goes to zero since it doesn't depend on $\beta$. Hence,
+
+$$
+\nabla_\beta f(\beta) = \left(X^\top W X \right)\beta -  X^\top W y
+$$
+Thus, 
+$$
+\nabla_\beta f(\hat{\beta}) = 0 \quad \text{ if and only if } \quad
+\left(X^\top W X \right)\hat{\beta} -  X^\top W y = 0
+$$
+or equivalently,
+$$
+ \left(X^\top W X\right) \hat{\beta} =  X^\top Wy,
+$$
+which is the desired expression as a system of linear equations. This system is often referred to as the system of *normal equations*.
+
+### (B) Computing the Solution
+
+<strong><em>
+One way to calculate $\beta$ is to: (1) recognize that, trivially, the solution to the above linear system must satisfy $\beta =  \left(X^\top W X\right)^{-1} X^\top Wy$; and (2) to calculate this directly, i.e. by inverting $X^\top WX$. Let’s call this the “inversion method” for calculating the WLS solution. 
+
+Numerically speaking, is the inversion method the fastest and most stable way to actually solve the above linear system? Do some independent sleuthing on this question. Summarize what you ﬁnd, and provide pseudo-code for at least one alternate method based on matrix factorizations—call it “your method” for short. (Note: our linear system is not a special ﬂower; whatever you discover about general linear systems should apply here.) 
+</strong></em>
+
+
+**The Fear: Floating-point Arithmetic**. Numbers appearing in arithmetic computations can be accidentaly rounded-off for a variety of reasons. Computers represent numbers using the floating-point *mantissa* representation
+$$
+\mathrm{significand}\times\mathrm{base}\times^\mathrm{exponent}
+$$
+The most used standard is IEEE-754, which uses a binary base. A number with an infinite representation in binary form can cause roundoff problems. In addition to the binary representation, other commong issues are
+
+*  Number too small for the computer to distinguish from zero (underflow)
+*  Number too large for the computer to distinguish from infinity (overflow)
+
+Here is an example of rouding errors due to *problems with binary number representation*
+```{r}
+1*(.5-.4-.1) # should be zero....
+```
+This is an example of *overflow*
+```{r}
+10^1000 - 10^1000  # should be zero...
+```
+
+Here's a list of famous disasters caused by round-off errors: [link](http://ta.twi.tudelft.nl/users/vuik/wi211/disasters.html).
+
+**Our Problem: Ill Systems**. Unnecessarily inverting a matrix is often considered as one of the the biggest sins in computation. Many times we only need the solution of a linear system, and fully computing the inverse of a matrix is not only innefficient, but the extra operation can actually cause many more round-off errors. This is particularly true for normal equations of the least square problem.
+
+When I worked as a statistical consultant, I once encountered an R package for Item Response Theory that yielded only errors for our data. After investigating the package's code, I realized that error's cause was the solution of a linear system by matrix inversion. I decided to use the singular value descomposition instead, and the package started to work as expected.
+
+Before discussing the specific case of Least Squares, I would like to introduce the general concept of *condition number* of a matrix, which is a measure of how problematic a linear system with that matrix would be, in the sense of the distortion in a solution by possible small errors.
+
+
+-----------------------------------
+
+##### &sect; *Condition Number*
+
+Let's situate ourselves in the context of trying to solve a system of linear equations
+$$
+Ax = b.
+$$
+We assume that $A\in \mathbb{R}^{n\times n}$ is invertible and thus a *unique* solution $x = A^{-1}b$ exists.The purpose of the condition number $\kappa(A)$ will be to measure what can happen to the solution $x$ as a small perturbation $\epsilon$ occurs in $b$. 
+
+We will start by replacing $b$ for $\tilde{b} = b + \epsilon$. We think of $\epsilon$ as a perturbation that can arise from round-off error as discussed in the previous section. The *change in the solution* is 
+$$A^{-1}\tilde{b}- A^{-1}b = A^{-1}\epsilon.$$
+The *magnitude* of the solution error *relative* to the input term $b$ is
+$$
+\frac{|\text{newsolution - solution}|}{|\text{solution}|} = \frac{\lVert A^{-1}\epsilon \lVert}{\lVert A^{-1}b\rVert}
+$$
+We would like to compare this quantity with the *relative size of the error* $\epsilon$, that is, we want to know the ratio
+$$
+\frac{\frac{\lVert A^{-1}\epsilon \lVert}{\lVert A^{-1}b\rVert}}{ \frac{\lVert\epsilon\rVert}{\lVert b\rVert}} = \left(\frac{\lVert A^{-1}\epsilon\rVert}{\lVert\epsilon\rVert}\right)\left(\frac{\lVert b\rVert}{\lVert A^{-1}b\rVert}\right)
+$$
+The *condition number* $\kappa(A)$ is defined is the maximum value that the above ratio of errors can take. Mathematically,
+$$
+\begin{aligned}
+\kappa(A) &= \max_{b,\epsilon \neq 0} \left(\frac{\lVert A^{-1}\epsilon\rVert}{\lVert\epsilon\rVert}\right)\left(\frac{\lVert b\rVert}{\lVert A^{-1}b\rVert}\right) \\
+&=  \max_{b,\epsilon \neq 0}  \left\lVert A^{-1} \frac{\epsilon}{\lVert\epsilon\rVert} \right\rVert  \left\lVert A^{-1} \frac{b}{\lVert b\rVert} \right\rVert^{-1}  \\
+&=  \max_{\lVert b \rVert =1 ,\lVert \epsilon \rVert =1 }  \left\lVert A^{-1} \epsilon \right\rVert  \left\lVert A^{-1} b \right\rVert^{-1} \\
+&=  \max_{\lVert \epsilon \rVert =1 }  \left\lVert A^{-1} \epsilon \right\rVert
+\min_{\lVert b \rVert =1} \left\lVert A^{-1} b \right\rVert
+\end{aligned}
+$$
+The condition number is related to the concept of *singular values* (and hence with the singular value decomposition). For those less familar with the concept of singular values, we can take the following identities as a definition the maximum singular value $\sigma_\max$ and minimal singular value of $\sigma_\min$:
+$$
+\max_{\lVert v \rVert =1 }  \left\lVert A v \right\rVert = \sigma_\max(A) \quad \text{and}  \quad
+\min_{\lVert v \rVert =1 }  \left\lVert A v \right\rVert = \sigma_\min(A).
+$$
+The following identities are very easy to verify from the above
+$$
+\sigma_\max(A) = \sigma_\min(A^{-1}) \quad \text{ and } \quad 
+\sigma_\min(A) = \sigma_\max(A^{-1})
+$$
+This leads to the most common way of writing the condition number
+$$
+\kappa(A) = \frac{\sigma_\max(A)}{\sigma_\min(A)}
+$$
+Observe that a matrix with a small value of $\sigma_{\text{min}}$ will have a huge condition number, and this occurs when the columns of $A$ are close to be linearly dependent. The extreme case happens if $A$ has linearly dependent columns (and thus a non-trivial kernel); in this case $\sigma_\min=0$, and the condition number is infinite. 
+
+The lowest value that the condition number can take is $\kappa(A)=1$. Using the last expression of condition number in terms of singular values, we can actually define it for any matrix, since the singular values always exist.
+
+
+-----------------------------------
+
+**The Condition Number in a Least Squares Problem**. The reason I wanted to argue in terms of the condition number, is because it helps to analyse what's wrong with the system
+$$
+ \left(X^\top W X\right) \hat{\beta} =  X^\top Wy.
+$$
+If $X^\top W X$ has a large condition number, then our solution $\hat{\beta}$ could blow up due to small round-off errors. *But why can it be be super ill-conditioned?* To answer this, let us restrict ourselves to the case where $W$ the identity matrix $I_N$. It is very easy to extend the discussion to the general case by noting that the system we are trying to solve is equivalent to
+$$
+ \left(\tilde{X}^\top  \tilde{X}\right) \hat{\beta} =  \tilde{X}^\top\tilde{y}.
+$$
+with $\tilde{X} = W^{1/2}X$ and $\tilde{y} = W^{1/2}y$, so the weighted case is equivalent to the non-weighted case after a simple rescaling. Again, I will drop the notation of tildes to simplify presentation (and writing).
+
+Here's the reason: the columns of our matrix $X$ represent our variables, which in many cases, have a strong linear dependency, that we statisticians call *high correlation*. Indeed, $X$ will not have full rank if one variable is a combination of the others, making $X^\top X$ not invertible.
+
+If the variables in our data are highly correlated, then the ill-conditioning effect will propagate to our solution in a squared way! This is because the singular values of $X^\top X$ are the square of the singular values of $X$. There are many ways to see this, but the easiest is using the singular value decomposition of $X$. Namely, if 
+$$
+X = UD V^\top
+$$ 
+with $U$ and $V$ orthogonal matrices and $D$ a quasi-diagonal matrix containing the singular values of $X$ in the diagonal and with a block of zeros attached to match the dimensions of $U$ and $V$; then
+$$
+X^\top X = (U D V^\top)^\top (U D V^\top) = V D^\top D V^\top.
+$$
+This is the singular value decomposition of $X^\top X$ (in fact the spectral decomposition too), and assuming $N > P$, then $D^\top D$ is a diagonal matrix whose entries are the squares of the singular values of $X$, which happen to be the eigenvalues/singular values of $X^\top X$. From this we conclude that 
+$$
+\kappa(X^\top X) = \left( \kappa(X) \right)^2.
+$$
+This is why least squares can be extremely ill-conditioned with highly-correlated data. 
+
+
+**What should we do then? Matrix factorization and Efficiency**. The problem will remain ill-conditioned no matter the method, that's a fact. But some methods make unnecessiry multiplications, potentially introducing more perturbation along the way. Doing less operations can be good not only in time, but protection agains errors. The traditional ethod of inverting a matrix is the full Gauss method. Many methods use the same spirit but stop along the way and to a partial factorization of a matrix, instead of fully inverting it. This partial factorization allows to solve the system more efficiently. Furthermore, some solution methods will avoid passing through $X^\top X$, solving a system with condition number $\kappa(X)$. Before explaining how the methods are used for the Least Squares problem, I present an overall review table of matrix factorization methods for solving linear systems of equations.
+
+---------------------------------------------------------
+
+##### *&sect; Matrix Factorization Methods for solving Linear Systems*
+
+Here are the some of the most popular for solving $Ax=b$ with $A \in \mathbb{R}^{n\times n}$:
+
+| Method        | Efficiency    | Explanation   | Comment | Algorithm |
+| ------- |:----------:| --------------------------- |  -------------------- | ----------------- |
+| Matrix Inversion    | $\approx 2 n^3$ | Full Gaussian Elimination to obtain $A^{-1}$ and then compute $x=A^{=1}b$ | Unnecessary computations if the actual inverse is not needed | Gaussian Elimination (usually LU) with extra inversion steps |
+| LU decomposition      | $\approx \frac{2}{3} n^3$ | Finds $A=LU$ with $L$ and $U$ lower and upper triangular respectively; after that solves $Lz = b$ and then $Ux = z$ | Triangular systems are efficient and easy to solve |   Gaussian Elimination | 
+| QR factorization      | $\approx \frac{4}{3} n^3$      | Finds $A=QR$ with $Q$ orthogonal and $R$ upper triangular respectively; then solve triangular system $Rx = Q^\top b$ |  Better for some cases, note that we are using that $Q^{-1} = Q^\top$ | Householder reflections |
+| SVD     | $\approx 13n^3$  |  Finds $A=USV^\top$ with $U$ and $V$ orthogonal and $S$ diagonal with non-negative entries | It has the safest properties, the cornerstone of linear algebra, but slow | QR Algorithm (is not the same as QR factorization, but related) |
+| Cholesky factorization  | $\approx \frac{1}{3}n^3$ |  Finds $A=LL^\top$ where $L$ is lower triangular; after that solves $Lz = b$ and then $L^\top x = z$ | It only works if $A$ is symmetric positive semidefinite as in our case $X^\top X$ | Cholesky Algorithm |
+
+These methods are described thoroughly in any Numerical Analysis book.
+
+------------------------------------------------------------
+
+
+**Ok, so which one to use for WLS? **. From the above, the LU decomposition is rearly used because it requires computing $X^\top WX$ directly, and in this case the Cholesky decomposition is usually better. In order to know which one is preferred, we need to consider the stability of its method.
+
+The table above shows that the most efficient method is the Cholesky decomposition. But there's a catch: having to compute $X^\top WX$ squares the condition number (easy to check using the SVD decomposition), so it is actually unstable for ill-conditiones systems.
+
+*Conclusion*. It basically boils down to choosing between Cholesky, SVD and QR, here's a comparison.
+
+| Method         | Algorithm         | Stability      | When to choose              | Needs $X^\top WX$ |
+| -------------- | ----------------- | ------------ | ------------------------- | ------ |
+| Cholesky decomposition  |  Cholesky algorithm (partial Gaussian elimination) | Bad for ill-conditioned problems |  Speed if you algo want $X^\top WX$. Not very popular | Yes |
+|  QR factorisation  |  Householder reflections |   Good stability |   Most of the time. Good for sparse matrices (see below). Default method in R and Matlab | No |
+|  SVD decomposition  |  QR algorithm (this is different from QR factorization) |   The best | Very ugly problems | No |
+
+
+**Using the the QR decomposition for WLS**. Since it is the default method in R and Matlab. I will very roughly explain how to use it.
+
+***Case 1**: $W$ is the identity matrix*. Just so that the idea is clear, I will first do this case and then show how to include the weights. The equation we want to solve is
+$$
+\left(X^\top X\right) \hat{\beta} = X^\top y
+$$
+Perform the QR decomposition of $X$ which consists of a factorisation 
+$$
+X = QR
+$$
+with $Q$ an orthogonal matrix and $R$ upper triangular. The columns of an orthogonal matrix have orthonormal columns, so $Q^\top Q = I_n$, implying that the transpose is its own inverse. We see how the system will simplify 
+$$
+X^\top X = R^\top Q^\top Q R = R^\top R
+$$
+
+So the resulting system is
+
+$$
+\left(R^\top R\right) \hat{\beta} = X^\top y
+$$
+You might think it look similar, but now we only have to solve a lower triangular and an upper triangular system. Each one using the forward or backward subtitution algorithm takes.
+
+* *Step 1:* Solve the lower triangular system $R^\top z = X^\top y$ with forward subtitution.
+* *Step 2:* Solve the upper triangular system $R\hat{\beta} = z$ with backward subtitution.
+
+
+Two observations about the $QR$ method: 
+
+1. We don't to store $Q$, and by doing this, we save a few steps and memory. Sometimes this is referred to as the $Q$-less $QR$-decomposition.
+2. This method is good if $X$ is *sparse* (very few non-zero values), since $ X^\top y$ and the backward/forward substitution methods can be computed using sparse matrices multiplication techniques.
+
+***Case 2**: General $W$*. All we have to do is a little modification before performing the $QR$ decomposition. That is, we must multiply each row of $X$ by square root of the corresponding weight. Let $W^{1/2}$ be the diagonal matrix with square-rooted weights $W^{1/2}=\mathrm{diag}\left(\sqrt{w_1}, ..., \sqrt{w_N}\right)$. Then if
+$$
+\tilde{X} = W^{-1/2}X = QR
+$$
+Then
+$$
+X^\top W X = R^\top R
+$$
+So we have to solve the system
+$$
+\left(R^\top R\right) \hat{\beta} = X^\top W y
+$$
+And we can use the two-step technique of the simpler previous case.
+
+**The pseudo-algorithm** As a conclusion here's the pseudocode for using the $QR$ decomposition for WLS.
+
+```
+Input: 
+  X: Design matrix of Nxd
+  y: Independent variable vector of Nx1
+  w: Vector of weights of Nx1 
+Output:
+  beta: The coefficients of the weighted linear regression y ~ X*beta with weights w.
+
+Algorithm:
+  1. Obtain Xtilde multiplying each row i of X by the corresponding sqrt(w_i)
+  2. Obtain an upper triangular matrix R from the Q-less QR decomposition on Xtilde 
+  3. Compute b=Xtilde'*ytilde where ytilde is obtained from multiplying each entry i of y by sqrt(w_i)
+  4. Obtain z solving the system R'*z = b by forward substitution
+  5. Obtain beta solving the system R*beta = z using backward substitution
+  6. Return beta
+```
+
+### (C) Coding and testing with simulated and iris data
+
+We will code in R the proposed QR factorization for weighted least squares. We will use standard R functions for this. *Note*: This is actually the default method used by the function `lm` but we will reproduce it here. The programming style will focus on clarity rather than speed in R.
+
+**Programming our QR method**
+
+```{r}
+wls_fit <- function(X, y, weights) {
+  N <- nrow(X)
+  X <- as.matrix(X) # this way it works for vector/matrix/data.frame
+  # 1: Prepare for QR
+  Xtilde <- X * sqrt(weights) # R is smart, multiplies every row like this
+  # 2: QR decomposition
+  qrdecomp <- qr(Xtilde, LAPACK = TRUE)
+  R <- qr.R(qrdecomp) # base qr fun is odd, qr.R recovers R from the odd form of qr
+  # 3: Get RHS of linear system
+  ytilde <- y * sqrt(weights)
+  b <- t(Xtilde) %*% ytilde
+  # 4. Solve Step 1 of system
+  z <- forwardsolve(t(R), b)
+  # 5. Solve Step 2 of system
+  beta <- backsolve(R, z)
+  # Output
+  as.numeric(beta)
+}
+```
+
+Just to tame sure it works fine, here's a comparison with the `lm` method using the famous iris database.
+
+```{r}
+data(iris)
+X <- iris[ ,c("Petal.Length", "Petal.Width")]
+y <- iris[ ,"Sepal.Width"]
+weights <- rep(1, nrow(X))
+wls_fit(X, y, weights)
+```
+
+```{r}
+lm(Sepal.Width ~ Petal.Length + Petal.Width - 1, weights = weights, data = iris)
+```
+
+In the next bonus subsection we define a `wls` function that calls `wls_fit` but receives a formula just like R's `lm`. This is similar to what `lm` method does calling the`lm.fit` function. This is not part of the homework, so the reader may skip it. It is just fun.
+
+Finally, for the sake of completion, I want to include what should be the fastest, the Cholesky decomposition $(X^\top W X)=LL^\top$. I want go through the exact details but is similar to what we've done using triangular systems.
+
+**Comparisons with the inversion method and R's default functions**
+
+Matrix inversion is usually performed efficiently using the LU decomposition, which is a partial Gaussian elimination method. In R, inversion is done using the `solve` function without calling additional arguments. 
+
+```{r}
+inv_fit <- function(X, y, weights) {
+  # system inputs
+  X <- as.matrix(X)
+  A <- t(X) %*% (X * weights) # system matrix
+  A_inv <- chol2inv(A) # inverse using cholesky, which exploits symmetric pos def
+  b <- t(X) %*% (y * weights) # right hand side of system
+  # solution
+  beta <- A_inv %*% b # system solution
+  # output
+  as.numeric(beta)
+} 
+```
+
+We get the same results as before:
+
+```{r}
+inv_fit(X, y, weights)
+```
+
+
+**Comparison 1: iris**
+
+This is a small dataset that will server as warmup. We will the package `microbenchmark` to compare performance
+
+```{r}
+library(microbenchmark)
+```
+
+```{r}
+data(iris)
+X <- as.matrix(iris[ ,c("Petal.Length", "Petal.Width")])
+y <- iris[ ,"Sepal.Width"]
+weights <- rep(1, nrow(X))
+microbenchmark(
+  inv_fit(X, y, weights),
+  wls_fit(X, y, weights),
+  lm.wfit(X, y, weights),
+  times=100L
+)
+```
+
+For the first test, it seems that the inversion method is actually not bad at all, compare to R default's `lm.wfit`. We recall that this does not justify it's use, since for the condition number of corresponding system squares, potentially leading to much higher rounding errors. Nevertheless, the use of LU compensates the higher number of instructions required for the qr method. We also emphasize that out `wls_fit` actually uses `lm`'s `lm.wfit`. The difference is that this function comes "precompiled", and does not waste time calling interpreting higher level calls tu functions.
+
+**Mid size simulated data**
+
+Ok, so let's simulate a moderate dense database from a theoretical model.
+
+```{r}
+N <- 1e4 # 10,000 observations
+d <- 1e2 # 100 variables
+beta <- rnorm(d) # random coefficients
+sigma <- .01 # error size
+# X <- matrix(rnorm(N * d), ncol = d) # very large random design matrix, size ~ 769.2MB
+# y <- X %*% beta + rnorm(N, sd = sigma)
+# weights <- rep(1, N)
+# microbenchmark( # now this will take a while
+#   inv_fit(X, y, weights),
+#   wls_fit(X, y, weights),
+#   lm.wfit(X, y, weights),
+#   times=10L
+# )
+```
+
+
+**Large simulated data**
+
+Time to cruch (this actually takes a few hours using a i7 processor).
+
+```{r}
+N <- 1e5 # 100,000 observations
+d <- 1e4 # 10,000 variables
+beta <- rnorm(d) # random coefficients
+sigma <- .01 # error size
+# X <- matrix(rnorm(N * d), ncol = d) # very large random design matrix, size ~ 769.2MB
+# y <- X %*% beta + rnorm(N, sd = sigma)
+# weights <- rep(1, N)
+# microbenchmark( # now this will take a while
+#   inv_fit(X, y, weights),
+#   wls_fit(X, y, weights),
+#   lm.wfit(X, y, weights),
+#   times=2L
+# )
+```
+
+
+#### (Bonus subsection) Use metaprogramming to make it work just like the lm function of R
+
+This is an example of **metaprogramming** and will allow us to mimic the behaviour of `lm`. We will also add a default intercept to the model which can be removed writing `-1` just like in `lm`.
+
+```{r, warning=FALSE}
+wls <- function(model, data, weights = rep(1, nrow(data))) {
+  # some input validation
+  stopifnot(is.numeric(weights), length(weights) == nrow(data))
+  # make model a formula
+  model <- as.formula(model)
+  lhs <-  as.character(model)[[2]] # left side of formula
+  rhs <-  as.character(model)[[3]] # right side of formula
+  # response variable y
+  y <- data[ ,lhs]
+  # create design matrix X
+  if (rhs == ".") { # case 1: all formulas
+    X <- data[ ,-match(lhs, names(data))] # just remove y
+  } else {
+    remove_intercept <- grepl("-(.*?)1", rhs) # do we need intercept?
+    if (remove_intercept) {
+      rhs <- gsub("[ ]+(.*?)1", "", rhs) # get rid of intercept indication
+      var_names <- strsplit(rhs, "[ ]+[\\+][ ]+")[[1]] # regexps are awesome!
+      print(var_names)
+      X <- data[ ,names(data) %in% var_names, drop = FALSE] 
+    } else {
+      var_names <- strsplit(rhs, "[ ]+[\\+][ ]+")[[1]] # regexps are awesome!
+      X <- data.frame(
+        `(Intercept)` = 1,
+        data[ ,names(data) %in% var_names, drop = FALSE],
+        check.names = FALSE
+      )
+    }
+  }
+  # run the model 
+  beta <- wls_fit(X, y, weights)
+  names(beta) <- names(X)
+  # output
+  out <- list(
+    model = model,
+    coefficients = beta
+  )
+  out
+}
+```
+
+With intercept:
+
+```{r}
+wls(Sepal.Width ~ Petal.Length + Petal.Width, weights = rep(1/nrow(iris), nrow(iris)), data = iris)
+```
+
+```{r}
+lm(Sepal.Width ~ Petal.Length + Petal.Width, weights = rep(1/nrow(iris), nrow(iris)), data = iris)
+```
+
+No intercept:
+
+```{r}
+wls(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris)
+```
+
+```{r}
+lm(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris)
+```
+
+### (D) The Sparse World
+
+A *sparse matrix* $A$ is a matrix in which most elements are zero. A consequence is that traditional algorithms waste too much energy with unnecessary loops when handling these matrices. These matrices are usually represented more efficially as lists, each entry containing a row, a column, and a value. For example:
+$$
+\begin{bmatrix}
+0 & 0 & 0 & 0 & 9 & 0 \\
+0 & 9 & 0 & 0 & 0 & 0 \\
+4 & 0 & 0 & 2 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 5 \\
+0 & 0 & 2 & 0 & 0 & 0 
+\end{bmatrix}
+$$
+becomes
+
+| *nrows* | *ncolumns* | *nvalues* |
+| :--: |  :-----: | :-----: |
+|   5   |     6    |    6    |
+
+
+| *row* | *column* | *value* |
+| :---: |  :-----: | :-----: |
+|   1   |     5    |    9    |
+|   2   |     2    |    8    |
+|   3   |     1    |    4    |
+|   3   |     3    |    2    |
+|   4   |     6    |    5    |
+|   5   |     3    |    2    |
+
+Algorithms for sparse matrices adapt to this type of internal data representation. If a sparse matrix algorithm is used with a dense matrix, then it will less efficient, but they are typically much faster for sparse matrices.
+
+In R, the library `Matrix` handles sparse matrices, having a special S4 class. For the uninitiated is R's formal S4 classes, the thing to remember is that implication of having a class is that multiplication, summation, and many function can automatically identify if the input matrix is of this class, and then call appropriate corresponding algorithm.
+
+Let's save our sample sparse matrix in a variable `X`:
+
+```{r}
+library(Matrix)
+N <- 1e4
+d <- 1e3
+X <- Matrix(
+  data = rnorm(N * d) * rbinom(N * d, 1, 0.01),
+  nrow = N,
+  sparse = TRUE
+)
+X[1:5, 1:10] # sample view of X
+```
+
+```{r}
+str(X)
+```
+
+We see above that the rows and columns are stores in the fields `i` and `p` of this object; the values are stored in the property `x`.
+
+**Methods for sparse matrices**. We will now write a few methods for sparse matrices. Basically, we will give the sparse versions of the previous methods.
+
+```{r}
+sparse_qr_fit <- function(sparseX, y, weights) {
+  stopifnot(inherits(sparseX, "sparseMatrix")) # check if X is sparse
+  N <- nrow(sparseX)
+  # 1: Adjust for weights
+  Xtilde <- sparseX * sqrt(weights) # Xtilde is sparse!
+  ytilde <- y * sqrt(weights)
+  # 2: (Q-less) QR decomposition
+  qrdecomp <- qr(Xtilde)
+  R <- qrR(qrdecomp) # base qr fun is odd, qr.R recovers R from the odd form of qr
+  # 3: Get RHS of linear system
+  b <- crossprod(Xtilde, ytilde)
+  # 4. Solve Step 1 of system
+  z <- solve(t(R), b) # formal class system signature chooses forward solve automatically
+  # 5. Solve Step 2 of system
+  beta <- solve(R, z) # formal class system signature chooses backward solve automatically
+  # Output
+  as.numeric(beta)
+}
+```
+
+
+```{r}
+beta <- rnorm(d)
+err <- rnorm(N, 0, .01)
+y <- X %*% beta + err
+weights <- rep(1, N)
+microbenchmark(
+  wls_fit(as.matrix(X), y, weights),
+  sparse_qr_fit(X, y, weights),
+  times = 2L
+)
+```
+
+

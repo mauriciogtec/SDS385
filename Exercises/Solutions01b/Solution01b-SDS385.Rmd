@@ -1,0 +1,263 @@
+---
+title: "SDS 385 Stats Models for Big Data"
+subtitle: 'Solutions 01b: Mauricio Garcia Tec'
+output:
+  html_document: default
+  html_notebook: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = FALSE)
+```
+
+## Generalized Linear Models
+
+<strong><em>
+As an archetypal chase of a GLM, we'll consider the binomial logistic regression model
+$$
+y_i \sim \mathrm{Binom}(m_i, w_i),
+$$
+where $y_i$ is an integer number of "successes", $m_i$ is the number of trials for the $i$-tj case, and the succes probability $w_i$ is a regression on a feature vector $x_i$ given by the inverse logit transform
+$$
+w_i = \frac{1}{1 + \exp\{-x_i^\top\beta\}}.
+$$
+We want to estimate $\beta$ by the principle of maximum likelihood. For our "binary logistic regression", $m_i = 1$ and $y_i\in\{0.1\}$.
+
+As an aside, if you have a favorite data set or problem that involves a different GLM--say, a Poisson regression for count data--then feel free to work with that model instead throughout this entire section. The fact that we’re working with a logistic regression isn’t essential here; any GLM will do.
+
+#### (A) The Likelihood
+
+Start by writing out the negative log likelihood
+$$
+l(\beta) = -log\left\{\prod_{i=1}^N p(y_i \mid \beta) \right\}
+$$
+Simplify your expression as much as possible. This is the thing we want to minimize to compute the MLE. (By longstanding convention, we phrase optimization problems as minimization problems.) 
+
+Derive the gradient of this expression, $\nabla l(\beta)$. Note: your gradient will be a sum of terms $l_i(\beta)$, and it’s OK to use the shorthand
+$$
+w_i(\beta) = \frac{1}{1 + \exp\{-x_i^\top\beta\}}.
+$$
+in your expression.
+</strong></em>
+
+The model is for the binary logistic regression is
+$$
+y_i \sim \mathrm{Bernoulli}\left(w_i(\beta)\right)
+$$
+Or equivalently, that
+$$
+\mathbb{P}(y_i = x \mid \beta) = \begin{cases} 
+  w_i(\beta) & \text{if} & x = 1 \\
+  1 - w_i(\beta) & \text{if} & x = 0 \\
+  0   & & \text{otherwise} 
+\end{cases}
+$$
+or more succintly
+$$
+p_i(y_i) = w_i(\beta)^{y_i}( 1 - w_i(\beta))^{1 - y_i} \quad \text{ for } \quad y_i\in\{0,1\}
+$$
+The loglikelihood loss function is thus
+$$
+\begin{aligned}
+l(\beta) & = - \log \left\{ \prod_{i = 1}^n p_i(y_i \mid \beta ) \right\} \\
+& = - \sum_{i=1}^N \log \left\{ p_i(y_i \mid \beta ) \right\} \\
+& = - \sum_{i=1}^N \left\{ y_i \log(w_i(\beta)) + (1-y_i)\log(1 - w_i(\beta)) \right\} \\
+& = - \sum_{i=1}^N \left\{ \log(1 - w_i(\beta)) + y_i\log\left( \frac{w_i(\beta)}{1 - w_i(\beta)}\right) \right\}. 
+\end{aligned}
+$$
+For the last expression we only used standard properties of the logarithm; the interesting part, however, is that the function $y \mapsto log(y  / (1-y))$ is actually the inverse of $u \mapsto 1/(1 + \exp(-u))$, so the loglikelihood loss function reduces to
+$$
+\begin{aligned}
+l(\beta) & = - \sum_{i=1}^N \left\{ \log(1 - w_i(\beta)) + y_ix_i^\top \beta \right\} \\
+& = - \sum_{i=1}^N \left\{ \log\left(1 - \frac{1}{1 + \exp\{-x_i^\top\beta\}} \right) + y_ix_i^\top \beta \right\}  \\
+& = - \sum_{i=1}^N \left\{ \log\left(w_i(\beta) \right) - x_i^\top\beta + y_ix_i^\top \beta \right\}  \\
+& = \sum_{i=1}^N \left\{ -\log\left(w_i(\beta) \right) + (1 - y_i)x_i^\top \beta \right\} 
+\end{aligned}
+$$
+Computing the gradient of $l$ is now easy, we first need to differentiate $w_i(\beta)$
+$$
+\begin{aligned}
+\nabla_\beta w_i(\beta) &= \nabla_\beta \left\{ \left(1 + \exp\{-x_i^\top\beta\} \right)^{-1}  \right\} \\
+&= -\left(1 + \exp\{ - x_i^\top\beta\} \right)^{-2} \exp(-x_i^\top \beta)(-x_i) \\
+&= -w_i(\beta)^2 \left( \frac{1}{w_i(\beta)} - 1 \right)(-x_i) \\
+&=   w_i(\beta)\left(1 - w_i(\beta)\right) x_i 
+\end{aligned}
+$$
+To derivate above we just used the chain rule and the second matrix differentiation formula of the previous exercise (`Solution01a`). We now compute $\nabla_\beta l$
+$$
+\begin{aligned}
+\nabla_\beta l(\beta) &= \sum_{i=1}^N \nabla_\beta  \left\{ -\log(w_i(\beta)) + (1 - y_i)x_i^\top \beta \right\} \\
+ &= \sum_{i=1}^N \left\{ -\frac{\nabla_\beta w_i(\beta)}{w_i(\beta)} +  (1 - y_i)x_i \right\} \\
+ &= \sum_{i=1}^N \left\{ -\frac{w_i(\beta)(1 - w_i(\beta))}{w_i(\beta)}x_i +  (1 - y_i)x_i \right\} \\
+ &= \sum_{i = 1}^N \left\{ w_i(\beta) - y_i \right\}x_i \\
+\end{aligned}
+$$
+<!-- This is definitely a very beautiful expression for the following reason. We will bauptize the inverse function of $w_i(\beta)$ as the logit function. Namely, -->
+<!-- $$ -->
+<!-- \mathrm{logit}(u) =  \log\left(\frac{u}{1-u}\right). -->
+<!-- $$ -->
+<!-- The logistic regression model is equivalent to a regression of the form -->
+<!-- $$ -->
+<!-- \mathrm{logit}(y_i) = x_i^\top \beta + \epsilon_i -->
+<!-- $$ -->
+<!-- where $\epsilon_i$ are non-correlated errors. The prediction of $\mathrm{logit}(y_i)$ for a given value $\hat{beta}$, under the logistic model, is -->
+<!-- $$ -->
+<!-- \widehat{\mathrm{logit}{(y_i)}} = x_i^\top \hat{\beta} -->
+<!-- $$ -->
+<!-- and in the actual value of interest $y_i$, we have -->
+<!-- $$ -->
+<!-- \hat{y_i} =  -->
+<!-- $$ -->
+
+<strong><em>
+
+#### (B) Solution with Gradient Descent
+
+Read up on the method of steepest descent, i.e. gradient descent, in Nocedal and Wright (see course website). Write your own function that will ﬁt a logistic regression model by gradient descent. Grab the data “wdbc.csv” from the course website, or obtain some other real data that interests you, and test it out. The WDBC ﬁle has information on 569 breast-cancer patients from a study done in Wisconsin. The ﬁrst column is a patient ID, the second column is a classiﬁcation of a breast cell (Malignant or Benign), and the next 30 columns are measurements computed from a digitized image of the cell nucleus. These are things like radius, smoothness, etc. For this problem, use the ﬁrst 10 features for X, i.e. columns 3-12 of the ﬁle. If you use all 30 features you’ll run into trouble.
+</strong></em>
+
+For this solution I will assume familiarity with the Gradient Descent Method with Backtracking search. 
+
+##### Get the Data
+
+The varible $X$ will store 10 features and $y$ the outcome, where $y = 1$ if the cancer is Maligne and $y=0$ otherwise.
+
+```{r, warning=FALSE, message=FALSE}
+# Hint: read_csv of tidyverse's package readr is similar read.csv but "cleaner" and somewhat more efficient
+library(tidyverse)
+wdbc <- read_csv(
+  file = url("https://raw.githubusercontent.com/jgscott/SDS385/master/data/wdbc.csv"),
+  col_names = FALSE
+)
+X <- cbind(1, wdbc[ ,3:10]) # 1 adds an intercept
+X <- as.matrix(X) # for numericla algorithms
+y <- as.integer(wdbc[[2]] == "M")
+```
+
+```{r}
+head(X)
+```
+We can check the prevalence of maligne cancer
+```{r}
+print(table(y))
+print(sprintf("The prevalence of maligne cancer is %.2f%%", 100 * sum(y) / length(y)))
+```
+
+<!-- We will now write a pair of functions that compute the loglikelihood loss function and the gradient. I will write the functions using the Rcpp framework, which gives a C++ library of R-like classes and seamless R integration to call these functions. More information about the framework [here](http://dirk.eddelbuettel.com/code/rcpp.html). The last time I checked, over 800 CRAN packages used this awesome and super fast framework. For thus uninitiated in the workd of high-performance computing, C++ is one of the fastest programming languages, in particular, it is a *compiled* language, contrary R. The compiler does a nice translation to computer language at compiling time, at does not waste time when we run a command. -->
+
+<!-- ```{r, message=FALSE, warning=FALSE} -->
+<!-- library(Rcpp) -->
+<!-- ``` -->
+
+<!-- ```{r, engine = 'Rcpp'} -->
+<!-- #include <Rcpp.h> -->
+<!-- using namespace Rcpp; -->
+
+<!-- // Step 1: Define vectorized (w_i) and Logit Functions -->
+
+<!-- NumericVector logit(NumericVector u) { -->
+<!--   int N = u.size(); -->
+<!--   NumericVector res(N); -->
+<!--   for (int i = 0; i < N; i++) { -->
+<!--     res[i] = log(u[i] / (1 - u[i])); -->
+<!--   } -->
+<!--   return res; -->
+<!-- } -->
+
+<!-- NumericVector expit(NumericVector u) { -->
+<!--   int N = u.size(); -->
+<!--   NumericVector res(N); -->
+<!--   for (int i = 0; i < N; i++) { -->
+<!--     res[i] = 1 / (1 + exp(-u[i])); -->
+<!--   } -->
+<!--   return res; -->
+<!-- } -->
+
+<!-- // Step 2: Compute LogLoss and Its Gradient -->
+<!-- // The Directive [[Rcpp::export]] before the functions tells Rcpp to export the function to R's working environment -->
+
+<!-- // [[Rcpp::export]] -->
+<!-- double logloss(NumericVector beta, NumericVector y, NumericMatrix X) { -->
+<!--   int N = y.size(); -->
+<!--   int P = beta.size(); -->
+<!--   double ll = 0; -->
+<!--   for (int i = 0; i < N; i++) { -->
+<!--     res[i] = 1 / (1 + exp(-u[i])); -->
+<!--   }   -->
+<!--   return l; -->
+<!-- } -->
+<!-- ``` -->
+
+The versions of the loglikelihood loss and its gradient we gave are very easy to program in an efficient vectorized way
+```{r}
+
+expit <- function(u) {
+  # In:
+  #   u: vector of N x 1
+  # Out: the inverse-logit/expit function of the entries of u
+  1 / (1 + exp(-u))
+}
+
+logloss <- function(beta, X, y) {
+  # In: 
+  #   beta: vector of P x 1 of generalized regression coefficients   
+  #   X: design MATRIX of N x P
+  #   y: vector of N x 1 with binary outcomes
+  # Out: the loglikelihood loss
+  reg <- X %*% beta # X is usually a dataframe
+  w <- expit(as.numeric(reg))
+  yXb <- reg * y # multiplies each row by y_i as desired
+  # output
+  sum(-log(w) + (1 - y)*reg)
+}
+
+logloss_grad <- function(beta, X, y) {
+  # In: 
+  #   beta: vector of P x 1 of generalized regression coefficients   
+  #   X: design MATRIX of N x P
+  #   y: vector of N x 1 with binary outcomes
+  # Out: the gradient of the logloss  
+  reg <- X %*% beta # X is usually a dataframe
+  w <- expit(as.numeric(reg))
+  # output
+  colSums((w - y) * X)
+}
+```
+
+Now the routines for the Gradient Descent
+
+```{r}
+GradientDescent  <- function(x0, f, grad, control = NULL) {
+  # In:
+  #   x0: initial value
+  #   f: function to minimize
+  #   grad: gradient of objective function
+  #   controls: a list with the options for the algorithm
+  #     maxit: max number of iterations
+  #     tol: absolute tolerance for solution convergence
+  #     backtrack: constant with the value for backtrack step search
+  # Out: the a local minimizer of f
+  
+  # Default and user control values
+  maxit <- 1e4
+  tol <- 1e-12
+  for (i in seq_along(names(control))) { 
+    assign(names(control)[i], control[[i]]) # overwrite default
+  }
+  # Algorithm
+  x <- x0
+  oldvalue <- f(x0)
+  iter <- 1
+  step <- 0.00000001
+  # -- main iteration
+  for (i in 1:1000) {
+    x <- x - step * grad(x)
+    newvalue <- f(x)
+    if (newvalue < Inf && abs(oldvalue - newvalue) < tol) {
+      break
+    }
+    oldvalue <- newvalue
+  }
+  
+}
+```

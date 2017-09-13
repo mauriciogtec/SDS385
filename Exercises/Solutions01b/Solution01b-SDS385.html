@@ -166,14 +166,22 @@ l(\beta) &amp; = - \sum_{i=1}^N \left\{ \log(1 - w_i(\beta)) + y_ix_i^\top \beta
 \nabla_\beta w_i(\beta) &amp;= \nabla_\beta \left\{ \left(1 + \exp\{-x_i^\top\beta\} \right)^{-1}  \right\} \\
 &amp;= -\left(1 + \exp\{ - x_i^\top\beta\} \right)^{-2} \exp(-x_i^\top \beta)(-x_i) \\
 &amp;= -w_i(\beta)^2 \left( \frac{1}{w_i(\beta)} - 1 \right)(-x_i) \\
-&amp;=   w_i(\beta)\left(1 - w_i(\beta)\right) x_i 
+&amp;=   w_i(\beta)\left(1 - w_i(\beta)\right) x_i.
 \end{aligned}
-\]</span> To derivate above we just used the chain rule and the second matrix differentiation formula of the previous exercise (<code>Solution01a</code>). We now compute <span class="math inline">\(\nabla_\beta l\)</span> <span class="math display">\[
+\]</span> The expression is useful to compute <span class="math inline">\(\nabla_\beta l(\beta)\)</span>, but later it will be useful to rewrite the above in a convenient way. Write <span class="math inline">\(W = \textrm{diag}(w(\beta))\)</span>, then the <em>Jacobian</em> matrix <span class="math inline">\(\nabla_\beta w(\beta) \in \mathbb{R}^{N \times P}\)</span> of the map <span class="math display">\[
+\begin{aligned}
+\beta &amp; \mapsto (w_1(\beta),...,w_N(\beta))
+\end{aligned}
+\]</span> is the whose <span class="math inline">\(i\)</span>-th row is <span class="math inline">\(\nabla_iw(\beta)\)</span>. We see that <span class="math display">\[
+\nabla_\beta w(\beta) = X^\top W(1-W)
+\]</span></p>
+<p>We will use this result later, for now, we return to derivate <span class="math inline">\(l\)</span> using the chain rule with matrix differentiation (see <code>Solution01a</code> for the recap on matrix differentiation). We now compute <span class="math inline">\(\nabla_\beta l\)</span> <span class="math display">\[
 \begin{aligned}
 \nabla_\beta l(\beta) &amp;= \sum_{i=1}^N \nabla_\beta  \left\{ -\log(w_i(\beta)) + (1 - y_i)x_i^\top \beta \right\} \\
  &amp;= \sum_{i=1}^N \left\{ -\frac{\nabla_\beta w_i(\beta)}{w_i(\beta)} +  (1 - y_i)x_i \right\} \\
  &amp;= \sum_{i=1}^N \left\{ -\frac{w_i(\beta)(1 - w_i(\beta))}{w_i(\beta)}x_i +  (1 - y_i)x_i \right\} \\
  &amp;= \sum_{i = 1}^N \left\{ w_i(\beta) - y_i \right\}x_i \\
+ &amp;= X^\top(w(\beta) - y) \\
 \end{aligned}
 \]</span> <!-- This is definitely a very beautiful expression for the following reason. We will bauptize the inverse function of $w_i(\beta)$ as the logit function. Namely, --> <!-- $$ --> <!-- \mathrm{logit}(u) =  \log\left(\frac{u}{1-u}\right). --> <!-- $$ --> <!-- The logistic regression model is equivalent to a regression of the form --> <!-- $$ --> <!-- \mathrm{logit}(y_i) = x_i^\top \beta + \epsilon_i --> <!-- $$ --> <!-- where $\epsilon_i$ are non-correlated errors. The prediction of $\mathrm{logit}(y_i)$ for a given value $\hat{beta}$, under the logistic model, is --> <!-- $$ --> <!-- \widehat{\mathrm{logit}{(y_i)}} = x_i^\top \hat{\beta} --> <!-- $$ --> <!-- and in the actual value of interest $y_i$, we have --> <!-- $$ --> <!-- \hat{y_i} =  --> <!-- $$ --></p>
 <p><strong><em></p>
@@ -191,17 +199,17 @@ wdbc &lt;- read_csv(
   file = url(&quot;https://raw.githubusercontent.com/jgscott/SDS385/master/data/wdbc.csv&quot;),
   col_names = FALSE
 )
-X &lt;- cbind(1, wdbc[ ,3:7]) # 1 adds an intercept
+X &lt;- cbind(1, wdbc[ ,3:4]) # 1 adds an intercept
 X &lt;- as.matrix(X) # for numerical algorithms
 y &lt;- as.integer(wdbc[[2]] == &quot;M&quot;)</code></pre>
 <pre class="r"><code>head(X)</code></pre>
-<pre><code>##      1    X3    X4     X5     X6      X7
-## [1,] 1 17.99 10.38 122.80 1001.0 0.11840
-## [2,] 1 20.57 17.77 132.90 1326.0 0.08474
-## [3,] 1 19.69 21.25 130.00 1203.0 0.10960
-## [4,] 1 11.42 20.38  77.58  386.1 0.14250
-## [5,] 1 20.29 14.34 135.10 1297.0 0.10030
-## [6,] 1 12.45 15.70  82.57  477.1 0.12780</code></pre>
+<pre><code>##      1    X3    X4
+## [1,] 1 17.99 10.38
+## [2,] 1 20.57 17.77
+## [3,] 1 19.69 21.25
+## [4,] 1 11.42 20.38
+## [5,] 1 20.29 14.34
+## [6,] 1 12.45 15.70</code></pre>
 <p>We can check the prevalence of maligne cancer</p>
 <pre class="r"><code>print(table(y))</code></pre>
 <pre><code>## y
@@ -279,7 +287,7 @@ logloss_grad &lt;- function(beta, X, y) {
   reg &lt;- X %*% beta # X is usually a dataframe
   w &lt;- expit(as.numeric(reg))
   # output
-  colSums((w - y) * X)
+  as.numeric(crossprod(X, w - y))
 }</code></pre>
 </div>
 <div id="gradient-descent" class="section level5">
@@ -403,7 +411,7 @@ logloss_grad &lt;- function(beta, X, y) {
 <h5>The Results</h5>
 <p>I am gonna obtain our fitted values. Just to make sure I get the right answer, I will check with the <strong>R function</strong> <code>glm</code>.</p>
 <pre class="r"><code>mod &lt;- glm.fit(X, y, family = binomial())
-print(mod$coefficients)</code></pre>
+print(mod$coefficients) </code></pre>
 <pre><code>##          1         X3         X4 
 ## -19.849417   1.057102   0.218141</code></pre>
 <pre class="r"><code>prediction &lt;- round(mod$fitted.values) 
@@ -443,29 +451,34 @@ print(sprintf(&quot;The (rough) accuracy of the model is %.2f%%&quot;, 100 * acc
 <pre class="r"><code>control &lt;- list(
   maxit = 1e6,
   tol = 1e-5,
-  init_step_size = 1e-4 # I just know, but there's real good reason...
-)
+  init_step_size = 1e-4 # I just know, but there's no good reason...
+) 
 algotime &lt;- system.time({
   ourmod &lt;- logit_gdfit(X, y, control = control)
 })
 print(algotime)</code></pre>
 <pre><code>##    user  system elapsed 
-## 1264.67    0.01 1265.13</code></pre>
+##   54.78    0.01   54.82</code></pre>
 <pre class="r"><code>print(sprintf(&quot;%d iterations with convergence=%s&quot;, ourmod$iter, ourmod$convergence))</code></pre>
-<pre><code>## [1] &quot;265255 iterations with convergence=TRUE&quot;</code></pre>
+<pre><code>## [1] &quot;90187 iterations with convergence=TRUE&quot;</code></pre>
 <pre class="r"><code>print(ourmod$coefficients) # not too far</code></pre>
-<pre><code>##           1          X3          X4          X5          X6          X7 
-## -0.48903093 -3.09282884  0.15710081  0.27102222  0.02497115  0.16611167</code></pre>
+<pre><code>## [1] -18.7373906   0.9993179   0.2036745</code></pre>
 <pre class="r"><code>prediction &lt;- round(ourmod$fitted_values) 
 print(table(y, prediction))</code></pre>
 <pre><code>##    prediction
 ## y     0   1
-##   0 340  17
-##   1  40 172</code></pre>
+##   0 334  23
+##   1  39 173</code></pre>
 <pre class="r"><code>accuracy &lt;- sum(y == prediction) / length(y)
 print(sprintf(&quot;The (rough) accuracy of the model is %.2f%%&quot;, 100 * accuracy))</code></pre>
-<pre><code>## [1] &quot;The (rough) accuracy of the model is 89.98%&quot;</code></pre>
-<p><strong>So we actually reach the same accuracy of 94.02%!!!</strong> Of course, it took way longer…</p>
+<pre><code>## [1] &quot;The (rough) accuracy of the model is 89.10%&quot;</code></pre>
+<p>With 89.98% we weren’t too far from the 93.15% accuracy; we can actually decrease our <code>tol</code> and achieve that, but it already took 21 minutes in my fast i7 processor machine already, so we better propose something smarter (even if we had programmed it using C, we will priviledge intelligence over power, for this time). Here’s how our achieve logloss compares to the glmfit solution.</p>
+<pre class="r"><code>data.frame(
+  ourmod_logloss = logloss(ourmod$coefficients, X, y),
+  glm_logloss = logloss(mod$coefficients, X, y)
+)</code></pre>
+<pre><code>##   ourmod_logloss glm_logloss
+## 1       145.7677    145.5617</code></pre>
 </div>
 </div>
 </div>

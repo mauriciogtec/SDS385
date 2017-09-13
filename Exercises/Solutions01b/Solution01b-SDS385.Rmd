@@ -79,16 +79,28 @@ $$
 \nabla_\beta w_i(\beta) &= \nabla_\beta \left\{ \left(1 + \exp\{-x_i^\top\beta\} \right)^{-1}  \right\} \\
 &= -\left(1 + \exp\{ - x_i^\top\beta\} \right)^{-2} \exp(-x_i^\top \beta)(-x_i) \\
 &= -w_i(\beta)^2 \left( \frac{1}{w_i(\beta)} - 1 \right)(-x_i) \\
-&=   w_i(\beta)\left(1 - w_i(\beta)\right) x_i 
+&=   w_i(\beta)\left(1 - w_i(\beta)\right) x_i.
 \end{aligned}
 $$
-To derivate above we just used the chain rule and the second matrix differentiation formula of the previous exercise (`Solution01a`). We now compute $\nabla_\beta l$
+The expression is useful to compute $\nabla_\beta l(\beta)$, but later it will be useful to rewrite the above in a convenient way. Write $W = \textrm{diag}(w(\beta))$, then the *Jacobian* matrix $\nabla_\beta w(\beta) \in \mathbb{R}^{N \times P}$ of the map
+$$
+\begin{aligned}
+\beta & \mapsto (w_1(\beta),...,w_N(\beta))
+\end{aligned}
+$$
+is the whose $i$-th row is $\nabla_iw(\beta)$. We see that
+$$
+\nabla_\beta w(\beta) = X^\top W(1-W)
+$$
+
+We will use this result later, for now, we return to derivate $l$ using the chain rule with matrix differentiation (see  `Solution01a` for the recap on matrix differentiation). We now compute $\nabla_\beta l$
 $$
 \begin{aligned}
 \nabla_\beta l(\beta) &= \sum_{i=1}^N \nabla_\beta  \left\{ -\log(w_i(\beta)) + (1 - y_i)x_i^\top \beta \right\} \\
  &= \sum_{i=1}^N \left\{ -\frac{\nabla_\beta w_i(\beta)}{w_i(\beta)} +  (1 - y_i)x_i \right\} \\
  &= \sum_{i=1}^N \left\{ -\frac{w_i(\beta)(1 - w_i(\beta))}{w_i(\beta)}x_i +  (1 - y_i)x_i \right\} \\
  &= \sum_{i = 1}^N \left\{ w_i(\beta) - y_i \right\}x_i \\
+ &= X^\top(w(\beta) - y) \\
 \end{aligned}
 $$
 <!-- This is definitely a very beautiful expression for the following reason. We will bauptize the inverse function of $w_i(\beta)$ as the logit function. Namely, -->
@@ -128,7 +140,7 @@ wdbc <- read_csv(
   file = url("https://raw.githubusercontent.com/jgscott/SDS385/master/data/wdbc.csv"),
   col_names = FALSE
 )
-X <- cbind(1, wdbc[ ,3:7]) # 1 adds an intercept
+X <- cbind(1, wdbc[ ,3:4]) # 1 adds an intercept
 X <- as.matrix(X) # for numerical algorithms
 y <- as.integer(wdbc[[2]] == "M")
 ```
@@ -222,7 +234,7 @@ logloss_grad <- function(beta, X, y) {
   reg <- X %*% beta # X is usually a dataframe
   w <- expit(as.numeric(reg))
   # output
-  colSums((w - y) * X)
+  as.numeric(crossprod(X, w - y))
 }
 ```
 
@@ -354,7 +366,7 @@ gradient_descent  <- function(x0, f, grad, control=NULL, bt_control=NULL) {
 
 I am gonna obtain our fitted values. Just to make sure I get the right answer, I will check with the **R function** `glm`.
 
-```{r, cache=TRUE}
+```{r, cache=FALSE}
 mod <- glm.fit(X, y, family = binomial())
 print(mod$coefficients) 
 prediction <- round(mod$fitted.values) 
@@ -392,12 +404,12 @@ logit_gdfit <- function(X, y, ...) {
 }
 ```
 
-```{r, cache=TRUE}
+```{r, cache=FALSE}
 control <- list(
   maxit = 1e6,
   tol = 1e-5,
   init_step_size = 1e-4 # I just know, but there's no good reason...
-)
+) 
 algotime <- system.time({
   ourmod <- logit_gdfit(X, y, control = control)
 })
@@ -413,8 +425,8 @@ With 89.98% we weren't too far from the 93.15% accuracy; we can actually decreas
 
 ```{r, cache=TRUE}
 data.frame(
-  ourmod_logloss = f(ourmod$coefficients),
-  glm_logloss = f(mod$coefficients)
+  ourmod_logloss = logloss(ourmod$coefficients, X, y),
+  glm_logloss = logloss(mod$coefficients, X, y)
 )
 ```
 

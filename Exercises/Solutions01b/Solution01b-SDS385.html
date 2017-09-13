@@ -182,8 +182,8 @@ l(\beta) &amp; = - \sum_{i=1}^N \left\{ \log(1 - w_i(\beta)) + y_ix_i^\top \beta
 <h4>(B) Solution with Gradient Descent</h4>
 <p>Read up on the method of steepest descent, i.e. gradient descent, in Nocedal and Wright (see course website). Write your own function that will ﬁt a logistic regression model by gradient descent. Grab the data “wdbc.csv” from the course website, or obtain some other real data that interests you, and test it out. The WDBC ﬁle has information on 569 breast-cancer patients from a study done in Wisconsin. The ﬁrst column is a patient ID, the second column is a classiﬁcation of a breast cell (Malignant or Benign), and the next 30 columns are measurements computed from a digitized image of the cell nucleus. These are things like radius, smoothness, etc. For this problem, use the ﬁrst 10 features for X, i.e. columns 3-12 of the ﬁle. If you use all 30 features you’ll run into trouble. </strong></em></p>
 <p>For this solution I will assume familiarity with the Gradient Descent Method with Backtracking search.</p>
-<div id="get-the-data" class="section level5">
-<h5>Get the Data</h5>
+<div id="the-data" class="section level5">
+<h5>The Data</h5>
 <p>The varible <span class="math inline">\(X\)</span> will store 10 features and <span class="math inline">\(y\)</span> the outcome, where <span class="math inline">\(y = 1\)</span> if the cancer is Maligne and <span class="math inline">\(y=0\)</span> otherwise.</p>
 <pre class="r"><code># Hint: read_csv of tidyverse's package readr is similar read.csv but &quot;cleaner&quot; and somewhat more efficient
 library(tidyverse)
@@ -191,17 +191,17 @@ wdbc &lt;- read_csv(
   file = url(&quot;https://raw.githubusercontent.com/jgscott/SDS385/master/data/wdbc.csv&quot;),
   col_names = FALSE
 )
-X &lt;- cbind(1, wdbc[ ,3:10]) # 1 adds an intercept
-X &lt;- as.matrix(X) # for numericla algorithms
+X &lt;- cbind(1, wdbc[ ,3:7]) # 1 adds an intercept
+X &lt;- as.matrix(X) # for numerical algorithms
 y &lt;- as.integer(wdbc[[2]] == &quot;M&quot;)</code></pre>
 <pre class="r"><code>head(X)</code></pre>
-<pre><code>##      1    X3    X4     X5     X6      X7      X8     X9     X10
-## [1,] 1 17.99 10.38 122.80 1001.0 0.11840 0.27760 0.3001 0.14710
-## [2,] 1 20.57 17.77 132.90 1326.0 0.08474 0.07864 0.0869 0.07017
-## [3,] 1 19.69 21.25 130.00 1203.0 0.10960 0.15990 0.1974 0.12790
-## [4,] 1 11.42 20.38  77.58  386.1 0.14250 0.28390 0.2414 0.10520
-## [5,] 1 20.29 14.34 135.10 1297.0 0.10030 0.13280 0.1980 0.10430
-## [6,] 1 12.45 15.70  82.57  477.1 0.12780 0.17000 0.1578 0.08089</code></pre>
+<pre><code>##      1    X3    X4     X5     X6      X7
+## [1,] 1 17.99 10.38 122.80 1001.0 0.11840
+## [2,] 1 20.57 17.77 132.90 1326.0 0.08474
+## [3,] 1 19.69 21.25 130.00 1203.0 0.10960
+## [4,] 1 11.42 20.38  77.58  386.1 0.14250
+## [5,] 1 20.29 14.34 135.10 1297.0 0.10030
+## [6,] 1 12.45 15.70  82.57  477.1 0.12780</code></pre>
 <p>We can check the prevalence of maligne cancer</p>
 <pre class="r"><code>print(table(y))</code></pre>
 <pre><code>## y
@@ -246,6 +246,9 @@ y &lt;- as.integer(wdbc[[2]] == &quot;M&quot;)</code></pre>
 <!--   return l; -->
 <!-- } -->
 <!-- ``` -->
+</div>
+<div id="the-likelihood" class="section level5">
+<h5>The Likelihood</h5>
 <p>The versions of the loglikelihood loss and its gradient we gave are very easy to program in an efficient vectorized way</p>
 <pre class="r"><code>expit &lt;- function(u) {
   # In:
@@ -278,21 +281,83 @@ logloss_grad &lt;- function(beta, X, y) {
   # output
   colSums((w - y) * X)
 }</code></pre>
-<p>Now the routines for the Gradient Descent</p>
-<pre class="r"><code>GradientDescent  &lt;- function(x0, f, grad, control = NULL) {
+</div>
+<div id="gradient-descent" class="section level5">
+<h5>Gradient Descent</h5>
+<p>Now the routines for the Gradient Descent. An important fact: it does not work at all without line search, since the function we want to optimize is very bad behaved. This in fact very well known of the likelihood function.</p>
+<pre class="r"><code>bt_linesearch &lt;- function(x, search_direction, f, grad, control = NULL) {
+  # Backtracking Line Search # -------------------------
+  # 1. Armijo Rule
+  # 2. Curvature Rule
+  # Note: This line serach can be applied to many optimization algorithms that find decrease directions
+  # Reference: (Nocedal &amp; Wright 41)
+  # In: 
+  #   x: current point
+  #   search_direction: direction where to move
+  #   f: function to evaluate
+  #   grad: gradient of f (knowing grad(x) would be enough, but this is better presentation)
+  #   control:
+  #     init_step_size: initial step size in the search_direction, defaults to 1
+  #     bt_rate: constant indicating the speed of contraction of the direction, defaults to 0.9
+  #     min_decrease_rate: constant indicating the speed of contraction of the direction, defaults to 0.5
+  # Out: a constant indicating how many times should a direction be contracted to move to that point
+  #      using backtracking linesearch, with Armijo Rule only (no curvature condition)
+  #
+  # Initialize parameters (defaults/user)
+  bt_rate &lt;- 0.9
+  min_decrease_rate &lt;- 0.5
+  init_step_size &lt;- 1.0
+  maxit &lt;- 100
+  for (i in seq_along(names(control))) { # override defaults if user
+    assign(names(control)[i], control[[i]]) 
+  }
+  # Store useful constant values
+  val &lt;- f(x)
+  gradval &lt;- grad(x)
+  graddir_prod &lt;- crossprod(gradval, search_direction)
+  # Main loop
+  step_size &lt;- init_step_size
+  repeat {
+    newx &lt;- x + step_size * search_direction
+    newvalue &lt;- f(newx) 
+    min_decrease &lt;- - min_decrease_rate * step_size * graddir_prod
+    if (i &gt; maxit || newvalue &lt;= val - min_decrease) {
+      break
+    } else {
+      step_size &lt;- step_size * bt_rate
+      i &lt;- i + 1
+    }
+  }
+  if (i == maxit) {
+    warning(&quot;max number of iterations reached in backtracking&quot;)
+  }
+  # Output
+  list(
+    newx = newx,
+    newvalue = newvalue,
+    step_size = step_size,
+    iter = i
+  )
+}</code></pre>
+<pre class="r"><code>gradient_descent  &lt;- function(x0, f, grad, control=NULL, bt_control=NULL) {
   # In:
   #   x0: initial value
   #   f: function to minimize
   #   grad: gradient of objective function
-  #   controls: a list with the options for the algorithm
-  #     maxit: max number of iterations
-  #     tol: absolute tolerance for solution convergence
-  #     backtrack: constant with the value for backtrack step search
-  # Out: the a local minimizer of f
+  #   control: a list with the options for the algorithm
+  #     maxit: max number of iterations, defaults 1e4
+  #     tol: absolute tolerance for solution convergence, defaults 1e-11
+  #     init_step_size: initial step size for the gradient descent, defautls 0.5
+  #     recycle_step_size: use lineserach output as initial step_size for next linesearch, defaults false
+  #   bt_control: arguments to pass to the control argument of the bt_linesearch function
+  #   
+  # Out: the a local minimizer of f found using gradient descent with backtracking linesearch
   
   # Default and user control values
   maxit &lt;- 1e4
-  tol &lt;- 1e-12
+  tol &lt;- 1e-11
+  init_step_size &lt;- 0.5
+  recycle_step_size = FALSE
   for (i in seq_along(names(control))) { 
     assign(names(control)[i], control[[i]]) # overwrite default
   }
@@ -300,18 +365,107 @@ logloss_grad &lt;- function(beta, X, y) {
   x &lt;- x0
   oldvalue &lt;- f(x0)
   iter &lt;- 1
-  step &lt;- 0.00000001
+  step_size &lt;- init_step_size
   # -- main iteration
-  for (i in 1:1000) {
-    x &lt;- x - step * grad(x)
-    newvalue &lt;- f(x)
-    if (newvalue &lt; Inf &amp;&amp; abs(oldvalue - newvalue) &lt; tol) {
-      break
+  repeat {
+    bt_output &lt;- bt_linesearch(
+      x = x, 
+      search_direction = -grad(x), 
+      f = f, 
+      grad = grad, 
+      control = c(bt_control, list(init_step_size = step_size))
+    )
+    x &lt;- bt_output$newx
+    newvalue &lt;- bt_output$newvalue
+    if (recycle_step_size) {
+      step_size &lt;- bt_output$step_size  
     }
-    oldvalue &lt;- newvalue
+    # print(bt_output$iter)
+    # print(newvalue)
+    if (iter &gt;= maxit || newvalue &lt; Inf &amp;&amp; abs(oldvalue - newvalue) &lt; tol) {
+      break
+    } else {
+      oldvalue &lt;- newvalue
+      iter &lt;- iter + 1
+    }
   }
-  
+  convergence &lt;- !(iter == maxit)
+  # output
+  list(
+    x = x,
+    val = newvalue,
+    iter = iter,
+    convergence = convergence
+  )
 }</code></pre>
+</div>
+<div id="the-results" class="section level5">
+<h5>The Results</h5>
+<p>I am gonna obtain our fitted values. Just to make sure I get the right answer, I will check with the <strong>R function</strong> <code>glm</code>.</p>
+<pre class="r"><code>mod &lt;- glm.fit(X, y, family = binomial())
+print(mod$coefficients)</code></pre>
+<pre><code>##          1         X3         X4 
+## -19.849417   1.057102   0.218141</code></pre>
+<pre class="r"><code>prediction &lt;- round(mod$fitted.values) 
+print(table(y, prediction))</code></pre>
+<pre><code>##    prediction
+## y     0   1
+##   0 334  23
+##   1  39 173</code></pre>
+<pre class="r"><code>accuracy &lt;- sum(y == prediction) / length(y)
+print(sprintf(&quot;The (rough) accuracy of the model is %.2f%%&quot;, 100 * accuracy))</code></pre>
+<pre><code>## [1] &quot;The (rough) accuracy of the model is 89.10%&quot;</code></pre>
+<p>Now <strong>our solution</strong> with our methods. It will be very close, although the optimization problem is very complex for the gradient descent method alone.</p>
+<pre class="r"><code>logit_gdfit &lt;- function(X, y, ...) {
+  # In: 
+  #   X: design MATRIX of N x P
+  #   y: vector of N x 1 with binary outcomes
+  #   ...: control and bt_control arguments to pass to the gradient_descent engine.
+  # Output:
+  #   coefficients: the regression coefficients
+  #   fitted_values: the estimated probabilities of incidence
+  #   covergence: was there convergence?
+  #   iter: iterations of the back engine
+  mod &lt;- gradient_descent(
+    x0 = numeric(ncol(X)), # vector of zeros
+    f = function(beta) logloss(beta, X, y), 
+    grad = function(beta) logloss_grad(beta, X, y),
+    ...
+  )
+  # Output
+  list(
+    coefficients = mod$x,
+    fitted_values = as.numeric(expit(X %*% mod$x)),
+    convergence = mod$convergence,
+    iter = mod$iter
+  )
+}</code></pre>
+<pre class="r"><code>control &lt;- list(
+  maxit = 1e6,
+  tol = 1e-5,
+  init_step_size = 1e-4 # I just know, but there's real good reason...
+)
+algotime &lt;- system.time({
+  ourmod &lt;- logit_gdfit(X, y, control = control)
+})
+print(algotime)</code></pre>
+<pre><code>##    user  system elapsed 
+## 1264.67    0.01 1265.13</code></pre>
+<pre class="r"><code>print(sprintf(&quot;%d iterations with convergence=%s&quot;, ourmod$iter, ourmod$convergence))</code></pre>
+<pre><code>## [1] &quot;265255 iterations with convergence=TRUE&quot;</code></pre>
+<pre class="r"><code>print(ourmod$coefficients) # not too far</code></pre>
+<pre><code>##           1          X3          X4          X5          X6          X7 
+## -0.48903093 -3.09282884  0.15710081  0.27102222  0.02497115  0.16611167</code></pre>
+<pre class="r"><code>prediction &lt;- round(ourmod$fitted_values) 
+print(table(y, prediction))</code></pre>
+<pre><code>##    prediction
+## y     0   1
+##   0 340  17
+##   1  40 172</code></pre>
+<pre class="r"><code>accuracy &lt;- sum(y == prediction) / length(y)
+print(sprintf(&quot;The (rough) accuracy of the model is %.2f%%&quot;, 100 * accuracy))</code></pre>
+<pre><code>## [1] &quot;The (rough) accuracy of the model is 89.98%&quot;</code></pre>
+<p><strong>So we actually reach the same accuracy of 94.02%!!!</strong> Of course, it took way longer…</p>
 </div>
 </div>
 </div>

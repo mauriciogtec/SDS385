@@ -3,7 +3,6 @@ title: "SDS 385 Stats Models for Big Data"
 subtitle: 'Solutions 01b: Mauricio Garcia Tec'
 output:
   html_document: default
-  html_notebook: default
 ---
 
 ```{r setup, include=FALSE}
@@ -118,7 +117,7 @@ Read up on the method of steepest descent, i.e. gradient descent, in Nocedal and
 
 For this solution I will assume familiarity with the Gradient Descent Method with Backtracking search. 
 
-##### Get the Data
+##### The Data
 
 The varible $X$ will store 10 features and $y$ the outcome, where $y = 1$ if the cancer is Maligne and $y=0$ otherwise.
 
@@ -129,8 +128,8 @@ wdbc <- read_csv(
   file = url("https://raw.githubusercontent.com/jgscott/SDS385/master/data/wdbc.csv"),
   col_names = FALSE
 )
-X <- cbind(1, wdbc[ ,3:10]) # 1 adds an intercept
-X <- as.matrix(X) # for numericla algorithms
+X <- cbind(1, wdbc[ ,3:7]) # 1 adds an intercept
+X <- as.matrix(X) # for numerical algorithms
 y <- as.integer(wdbc[[2]] == "M")
 ```
 
@@ -188,6 +187,9 @@ print(sprintf("The prevalence of maligne cancer is %.2f%%", 100 * sum(y) / lengt
 <!-- } -->
 <!-- ``` -->
 
+##### The Likelihood
+
+
 The versions of the loglikelihood loss and its gradient we gave are very easy to program in an efficient vectorized way
 ```{r}
 
@@ -224,23 +226,88 @@ logloss_grad <- function(beta, X, y) {
 }
 ```
 
-Now the routines for the Gradient Descent
+##### Gradient Descent
+
+Now the routines for the Gradient Descent. An important fact: it does not work at all without line search, since the function we want to optimize is very bad behaved. This in fact very well known of the likelihood function.
 
 ```{r}
-GradientDescent  <- function(x0, f, grad, control = NULL) {
+bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
+  # Backtracking Line Search # -------------------------
+  # 1. Armijo Rule
+  # 2. Curvature Rule
+  # Note: This line serach can be applied to many optimization algorithms that find decrease directions
+  # Reference: (Nocedal & Wright 41)
+  # In: 
+  #   x: current point
+  #   search_direction: direction where to move
+  #   f: function to evaluate
+  #   grad: gradient of f (knowing grad(x) would be enough, but this is better presentation)
+  #   control:
+  #     init_step_size: initial step size in the search_direction, defaults to 1
+  #     bt_rate: constant indicating the speed of contraction of the direction, defaults to 0.9
+  #     min_decrease_rate: constant indicating the speed of contraction of the direction, defaults to 0.5
+  # Out: a constant indicating how many times should a direction be contracted to move to that point
+  #      using backtracking linesearch, with Armijo Rule only (no curvature condition)
+  #
+  # Initialize parameters (defaults/user)
+  bt_rate <- 0.9
+  min_decrease_rate <- 0.5
+  init_step_size <- 1.0
+  maxit <- 100
+  for (i in seq_along(names(control))) { # override defaults if user
+    assign(names(control)[i], control[[i]]) 
+  }
+  # Store useful constant values
+  val <- f(x)
+  gradval <- grad(x)
+  graddir_prod <- crossprod(gradval, search_direction)
+  # Main loop
+  step_size <- init_step_size
+  repeat {
+    newx <- x + step_size * search_direction
+    newvalue <- f(newx) 
+    min_decrease <- - min_decrease_rate * step_size * graddir_prod
+    if (i > maxit || newvalue <= val - min_decrease) {
+      break
+    } else {
+      step_size <- step_size * bt_rate
+      i <- i + 1
+    }
+  }
+  if (i == maxit) {
+    warning("max number of iterations reached in backtracking")
+  }
+  # Output
+  list(
+    newx = newx,
+    newvalue = newvalue,
+    step_size = step_size,
+    iter = i
+  )
+}
+```
+
+```{r}
+  
+gradient_descent  <- function(x0, f, grad, control=NULL, bt_control=NULL) {
   # In:
   #   x0: initial value
   #   f: function to minimize
   #   grad: gradient of objective function
-  #   controls: a list with the options for the algorithm
-  #     maxit: max number of iterations
-  #     tol: absolute tolerance for solution convergence
-  #     backtrack: constant with the value for backtrack step search
-  # Out: the a local minimizer of f
+  #   control: a list with the options for the algorithm
+  #     maxit: max number of iterations, defaults 1e4
+  #     tol: absolute tolerance for solution convergence, defaults 1e-11
+  #     init_step_size: initial step size for the gradient descent, defautls 0.5
+  #     recycle_step_size: use lineserach output as initial step_size for next linesearch, defaults false
+  #   bt_control: arguments to pass to the control argument of the bt_linesearch function
+  #   
+  # Out: the a local minimizer of f found using gradient descent with backtracking linesearch
   
   # Default and user control values
   maxit <- 1e4
-  tol <- 1e-12
+  tol <- 1e-11
+  init_step_size <- 0.5
+  recycle_step_size = FALSE
   for (i in seq_along(names(control))) { 
     assign(names(control)[i], control[[i]]) # overwrite default
   }
@@ -248,16 +315,106 @@ GradientDescent  <- function(x0, f, grad, control = NULL) {
   x <- x0
   oldvalue <- f(x0)
   iter <- 1
-  step <- 0.00000001
+  step_size <- init_step_size
   # -- main iteration
-  for (i in 1:1000) {
-    x <- x - step * grad(x)
-    newvalue <- f(x)
-    if (newvalue < Inf && abs(oldvalue - newvalue) < tol) {
-      break
+  repeat {
+    bt_output <- bt_linesearch(
+      x = x, 
+      search_direction = -grad(x), 
+      f = f, 
+      grad = grad, 
+      control = c(bt_control, list(init_step_size = step_size))
+    )
+    x <- bt_output$newx
+    newvalue <- bt_output$newvalue
+    if (recycle_step_size) {
+      step_size <- bt_output$step_size  
     }
-    oldvalue <- newvalue
+    # print(bt_output$iter)
+    # print(newvalue)
+    if (iter >= maxit || newvalue < Inf && abs(oldvalue - newvalue) < tol) {
+      break
+    } else {
+      oldvalue <- newvalue
+      iter <- iter + 1
+    }
   }
-  
+  convergence <- !(iter == maxit)
+  # output
+  list(
+    x = x,
+    val = newvalue,
+    iter = iter,
+    convergence = convergence
+  )
 }
 ```
+
+##### The Results
+
+I am gonna obtain our fitted values. Just to make sure I get the right answer, I will check with the **R function** `glm`.
+
+```{r, cache=TRUE}
+mod <- glm.fit(X, y, family = binomial())
+print(mod$coefficients) 
+prediction <- round(mod$fitted.values) 
+print(table(y, prediction))
+accuracy <- sum(y == prediction) / length(y)
+print(sprintf("The (rough) accuracy of the model is %.2f%%", 100 * accuracy))
+```
+
+Now **our solution** with our methods. It will be very close, although the optimization problem is very complex for the gradient descent method alone.
+
+```{r}
+logit_gdfit <- function(X, y, ...) {
+  # In: 
+  #   X: design MATRIX of N x P
+  #   y: vector of N x 1 with binary outcomes
+  #   ...: control and bt_control arguments to pass to the gradient_descent engine.
+  # Output:
+  #   coefficients: the regression coefficients
+  #   fitted_values: the estimated probabilities of incidence
+  #   covergence: was there convergence?
+  #   iter: iterations of the back engine
+  mod <- gradient_descent(
+    x0 = numeric(ncol(X)), # vector of zeros
+    f = function(beta) logloss(beta, X, y), 
+    grad = function(beta) logloss_grad(beta, X, y),
+    ...
+  )
+  # Output
+  list(
+    coefficients = mod$x,
+    fitted_values = as.numeric(expit(X %*% mod$x)),
+    convergence = mod$convergence,
+    iter = mod$iter
+  )
+}
+```
+
+```{r, cache=TRUE}
+control <- list(
+  maxit = 1e6,
+  tol = 1e-5,
+  init_step_size = 1e-4 # I just know, but there's no good reason...
+)
+algotime <- system.time({
+  ourmod <- logit_gdfit(X, y, control = control)
+})
+print(algotime)
+print(sprintf("%d iterations with convergence=%s", ourmod$iter, ourmod$convergence))
+print(ourmod$coefficients) # not too far
+prediction <- round(ourmod$fitted_values) 
+print(table(y, prediction))
+accuracy <- sum(y == prediction) / length(y)
+print(sprintf("The (rough) accuracy of the model is %.2f%%", 100 * accuracy))
+```
+With 89.98% we weren't too far from the 93.15% accuracy; we can actually decrease our `tol` and achieve that, but it already took 21 minutes in my fast i7 processor machine already, so we better propose something smarter (even if we had programmed it using C, we will priviledge intelligence over power, for this time). Here's how our achieve logloss compares to the glmfit solution.
+
+```{r, cache=TRUE}
+data.frame(
+  ourmod_logloss = f(ourmod$coefficients),
+  glm_logloss = f(mod$coefficients)
+)
+```
+

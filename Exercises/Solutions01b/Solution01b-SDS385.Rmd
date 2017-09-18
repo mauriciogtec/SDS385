@@ -423,17 +423,25 @@ $$
 \begin{aligned}
 l(\beta) & = l(\beta_0) + (\beta - \beta_0)^\top \nabla_\beta l(\beta_0) + \frac{1}{2}(\beta - \beta_0)^\top \nabla_\beta^2l(\beta_0)(\beta - \beta_0)  + O\left(\lVert \beta - \beta_0 \rVert^3 \right) \\
 & = l(\beta_0) + (\beta - \beta_0)^\top X^\top (w(\beta_0) - y) + \frac{1}{2}(\beta - \beta_0)^\top X^\top \tilde{W} X (\beta - \beta_0)   + O\left(\lVert \beta - \beta_0 \rVert^3 \right) \\
+& = l(\beta_0) + (X\beta - X\beta_0)^\top (w(\beta_0) - y) + \frac{1}{2}(X\beta - X\beta_0)^\top  \tilde{W}  (X\beta - X\beta_0)   + O\left(\lVert \beta - \beta_0 \rVert^3 \right) \\
+& = l(\beta_0) + h^\top (w(\beta_0) - y) + \frac{1}{2}h^\top  \tilde{W} h   + O\left(\lVert \beta - \beta_0 \rVert^3 \right) \\
 \end{aligned}
 $$
-We can further simplify this expression by completing the square in the quatratic expression above, yielding
+We can further simplify this expression by completing the square in the quatratic expression above, taking $h$ as the variable, yielding
 $$
 \begin{aligned}
-l(\beta) & = \frac{1}{2}\left[\beta - \beta_0 + (X^\top\tilde{W} X)^{-1}X^\top(w(\beta_0) - y)\right]^\top X^\top\tilde{W} X \left[\beta - \beta_0 + (X^\top\tilde{W} X)^{-1}X^\top(w(\beta_0) - y)\right] + \text{const.} +  O\left(\lVert \beta - \beta_0 \rVert^3 \right) \\
+& l(\beta_0) + h^\top (w(\beta_0) - y) + \frac{1}{2}h^\top  \tilde{W} h   + O\left(\lVert \beta - \beta_0 \rVert^3 \right) \\
+&=
+\frac{1}{2} \left[h - \tilde{W}^{-1}(w(\beta_0) - y)\right]^\top\tilde{W}\left[h - \tilde{W}^{-1}(w(\beta_0) - y) \right] + \text{const} + O\left(\lVert \beta - \beta_0 \rVert^3 \right),
 \end{aligned}
 $$
-Denote $H = X(X^\top X)X^\top$ the linear projection matrix into the columns of $X$. Then the above has the form
+where $\text{const}$, is a generic constant not depending on $h$ (or $\beta$). Writing again in terms of $\beta$, we get
 $$
-\begin{aligned}
-l(\beta) & = \frac{1}{2}\left[X(\beta - \beta_0) + H(w(\beta_0) - y)\right]^\top \tilde{W} \left[X(\beta - \beta_0) + H (w(\beta_0) - y)\right] + \text{const.} +  O\left(\lVert \beta - \beta_0 \rVert^3 \right) \\
-\end{aligned}
+l(\beta) = \frac{1}{2}\left[X\beta - z\right]^\top\tilde{W}\left[X\beta - z\right] + \text{const.} +  O\left(\lVert \beta - \beta_0 \rVert^3 \right)
 $$
+where $z = X\beta_0 + \tilde{W}^{-1}(w(\beta_0) - y)$. It's interesting because we can think of $z$ as the sum of the current regression value plus a weighted error in the approximation given by 
+$$
+\tilde{W}^{-1}(w(\beta_0) - y) = \sum_i (w_i(\beta_0) - y) / (w_i(\beta)(1-w_i(\beta)) = \alpha^\top \epsilon 
+$$
+for working errors $\epsilon_i = w_i(\beta_0) - y_i$, weighted by $\alpha_i = (w_i(\beta)(1-w_i(\beta)))^{-1}$.
+Newthon's method 

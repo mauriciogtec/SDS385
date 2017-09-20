@@ -444,4 +444,25 @@ $$
 \tilde{W}^{-1}(w(\beta_0) - y) = \sum_i (w_i(\beta_0) - y) / (w_i(\beta)(1-w_i(\beta)) = \alpha^\top \epsilon 
 $$
 for working errors $\epsilon_i = w_i(\beta_0) - y_i$, weighted by $\alpha_i = (w_i(\beta)(1-w_i(\beta)))^{-1}$.
-Newthon's method 
+
+*The algorithm*. Newthon's method for the minimum of a function $f\in C^2$ consists of approximation $f$ at a canditate solution $x_i$, using the second order taylor expansion 
+$$
+f(x) \approx f(x_i) + \nabla f(x_i)^\top (x-x_i) + \frac{1}{2}(x - x_i)^\top\nabla^2 f(x_i)(x-x_i),
+$$
+we then finding the minimum of this approximation, and take resulting minimizer $x_{i+1}$ as the next candidate solution. We see that the taylor approximation has an exact solution
+$$
+x_{i + 1} = x_i - (\nabla^2 f)^{-1}\nabla f(x_i).
+$$
+It can be proved that under our assumptions of smoothness,  there exists a radius near every local minimizer $x^*$, in which the of convergence $x_i \to x^*$ is guaranteed, and has a quadratic rate.
+
+**Slight improvement**. We recognize that $-(\nabla^2 f)^{-1}\nabla f(x_i)$ is a direction in which we are moving to find an optimal solution. Could we take shorter or longer steps in this direction? The answer is: Newthon's method has a natural step/learning rate of one, since the quadratic converge is guaranteed once one is sufficiently closed to an optimizer. However, one could try to do smaller or larger steps at the beginning, to make sure the function is actually decreasing enough. The strategies to a find a step size are the same as in the gradient descent case.
+
+**Summary of the method for logistic regression**. In the beginning of this section we noticed that the problem of finding the new $x_{i+1}$ is equivalent to solving a weighted least square problem of the form
+$$
+l(\beta) = \frac{1}{2}\left(X\beta - z\right)^\top\tilde{W}\left(X\beta - z\right).
+$$
+On the other hand, computing 
+$$
+- (\nabla^2 f)^{-1}\nabla f(x_i).
+$$
+would be harder, and just like

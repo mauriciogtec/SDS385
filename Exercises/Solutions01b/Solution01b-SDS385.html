@@ -194,17 +194,17 @@ wdbc &lt;- read_csv(
   file = url(&quot;https://raw.githubusercontent.com/jgscott/SDS385/master/data/wdbc.csv&quot;),
   col_names = FALSE
 )
-X &lt;- cbind(1, wdbc[ ,3:4]) # 1 adds an intercept
+X &lt;- cbind(1, scale(wdbc[ ,3:4])) # 1 adds an intercept
 X &lt;- as.matrix(X) # for numerical algorithms
 y &lt;- as.integer(wdbc[[2]] == &quot;M&quot;)</code></pre>
 <pre class="r"><code>head(X)</code></pre>
-<pre><code>##      1    X3    X4
-## [1,] 1 17.99 10.38
-## [2,] 1 20.57 17.77
-## [3,] 1 19.69 21.25
-## [4,] 1 11.42 20.38
-## [5,] 1 20.29 14.34
-## [6,] 1 12.45 15.70</code></pre>
+<pre><code>##                X3         X4
+## [1,] 1  1.0960995 -2.0715123
+## [2,] 1  1.8282120 -0.3533215
+## [3,] 1  1.5784992  0.4557859
+## [4,] 1 -0.7682333  0.2535091
+## [5,] 1  1.7487579 -1.1508038
+## [6,] 1 -0.4759559 -0.8346009</code></pre>
 <p>We can check the prevalence of maligne cancer</p>
 <pre class="r"><code>print(table(y))</code></pre>
 <pre><code>## y
@@ -318,6 +318,7 @@ logloss_grad &lt;- function(beta, X, y) {
   gradval &lt;- grad(x)
   graddir_prod &lt;- crossprod(gradval, search_direction)
   # Main loop
+  i  &lt;- 1
   step_size &lt;- init_step_size
   repeat {
     newx &lt;- x + step_size * search_direction
@@ -406,8 +407,8 @@ logloss_grad &lt;- function(beta, X, y) {
 <p>I am gonna obtain our fitted values. Just to make sure I get the right answer, I will check with the <strong>R function</strong> <code>glm</code>.</p>
 <pre class="r"><code>mod &lt;- glm.fit(X, y, family = binomial())
 print(mod$coefficients) </code></pre>
-<pre><code>##          1         X3         X4 
-## -19.849417   1.057102   0.218141</code></pre>
+<pre><code>##                    X3         X4 
+## -0.7075673  3.7252785  0.9382323</code></pre>
 <pre class="r"><code>prediction &lt;- round(mod$fitted.values) 
 print(table(y, prediction))</code></pre>
 <pre><code>##    prediction
@@ -452,11 +453,11 @@ algotime &lt;- system.time({
 })
 print(algotime)</code></pre>
 <pre><code>##    user  system elapsed 
-##   42.26    0.00   42.32</code></pre>
+##    1.17    0.00    1.17</code></pre>
 <pre class="r"><code>print(sprintf(&quot;%d iterations with convergence=%s&quot;, ourmod$iter, ourmod$convergence))</code></pre>
-<pre><code>## [1] &quot;90187 iterations with convergence=TRUE&quot;</code></pre>
+<pre><code>## [1] &quot;4528 iterations with convergence=TRUE&quot;</code></pre>
 <pre class="r"><code>print(ourmod$coefficients) # not too far</code></pre>
-<pre><code>## [1] -18.7373906   0.9993179   0.2036745</code></pre>
+<pre><code>## [1] -0.7066973  3.6851743  0.9327972</code></pre>
 <pre class="r"><code>prediction &lt;- round(ourmod$fitted_values) 
 print(table(y, prediction))</code></pre>
 <pre><code>##    prediction
@@ -472,13 +473,15 @@ print(sprintf(&quot;The (rough) accuracy of the model is %.2f%%&quot;, 100 * acc
 )
 print(comparison)</code></pre>
 <pre><code>##   ourmod_logloss glm_logloss
-## 1       145.7677    145.5617</code></pre>
+## 1        145.568    145.5617</code></pre>
 <p>With 89.98% we weren’t too far from the 93.15% accuracy; we can actually decrease our <code>tol</code> and achieve that, but it already took 21 minutes in my fast i7 processor machine already, so we better propose something smarter (even if we had programmed it using C, we will priviledge intelligence over power, for this time). Here’s how our achieve logloss compares to the glmfit solution.</p>
 </div>
 </div>
 <div id="b-newthons-method" class="section level4">
 <h4>(B) Newthon’s Method</h4>
-<p>To do a second order optimizatino method we need the Hessian matrix <span class="math inline">\(\nabla^2_\beta l(\beta)\)</span>. Fortunately, it is easy to compute, since <span class="math display">\[
+<div id="newthons-minimization-algorithm" class="section level5">
+<h5>Newthon’s minimization algorithm</h5>
+<p><strong>Second order approximation</strong> To do a second order optimizatino method we need the Hessian matrix <span class="math inline">\(\nabla^2_\beta l(\beta)\)</span>. Fortunately, it is easy to compute, since <span class="math display">\[
 \begin{aligned}
 \nabla^2_\beta l(\beta) &amp;= \nabla_\beta \left( \nabla_\beta l(\beta) \right) \\
 &amp;= \nabla_\beta \left( X^\top(w(\beta) - y)  \right) \\
@@ -504,7 +507,7 @@ l(\beta) = \frac{1}{2}\left[X\beta - z\right]^\top\tilde{W}\left[X\beta - z\righ
 \]</span> where <span class="math inline">\(z = X\beta_0 + \tilde{W}^{-1}(w(\beta_0) - y)\)</span>. It’s interesting because we can think of <span class="math inline">\(z\)</span> as the sum of the current regression value plus a weighted error in the approximation given by <span class="math display">\[
 \tilde{W}^{-1}(w(\beta_0) - y) = \sum_i (w_i(\beta_0) - y) / (w_i(\beta)(1-w_i(\beta)) = \alpha^\top \epsilon 
 \]</span> for working errors <span class="math inline">\(\epsilon_i = w_i(\beta_0) - y_i\)</span>, weighted by <span class="math inline">\(\alpha_i = (w_i(\beta)(1-w_i(\beta)))^{-1}\)</span>.</p>
-<p><em>The algorithm</em>. Newthon’s method for the minimum of a function <span class="math inline">\(f\in C^2\)</span> consists of approximation <span class="math inline">\(f\)</span> at a canditate solution <span class="math inline">\(x_i\)</span>, using the second order taylor expansion <span class="math display">\[
+<p><strong>The algorithm</strong>. Newthon’s method for the minimum of a function <span class="math inline">\(f\in C^2\)</span> consists of approximation <span class="math inline">\(f\)</span> at a canditate solution <span class="math inline">\(x_i\)</span>, using the second order taylor expansion <span class="math display">\[
 f(x) \approx f(x_i) + \nabla f(x_i)^\top (x-x_i) + \frac{1}{2}(x - x_i)^\top\nabla^2 f(x_i)(x-x_i),
 \]</span> we then finding the minimum of this approximation, and take resulting minimizer <span class="math inline">\(x_{i+1}\)</span> as the next candidate solution. We see that the taylor approximation has an exact solution <span class="math display">\[
 x_{i + 1} = x_i - (\nabla^2 f)^{-1}\nabla f(x_i).
@@ -515,6 +518,97 @@ l(\beta) = \frac{1}{2}\left(X\beta - z\right)^\top\tilde{W}\left(X\beta - z\righ
 \]</span> On the other hand, computing <span class="math display">\[
 - (\nabla^2 f)^{-1}\nabla f(x_i).
 \]</span> would be harder, and just like</p>
+</div>
+<div id="implementation-of-newthons-method-in-r" class="section level5">
+<h5>Implementation of Newthon’s method in R</h5>
+<pre class="r"><code>logit_newthon_direction &lt;- function(X, y, beta0) {
+  # Input type validation
+  stopifnot(
+    inherits(X, c(&quot;Matrix&quot;, &quot;matrix&quot;)), 
+    inherits(y, c(&quot;numeric&quot;, &quot;integer&quot;, &quot;boolean&quot;))
+  )
+  # Computations to obtain the working weights and responses for intermediate WLS
+  reg &lt;- as.numeric(X %*% beta0) # Regression at beta0
+  prediction &lt;- sigmoid(-reg) # Vector of current predictions
+  prediction_bias &lt;- prediction - y # prediction error
+  wlm_weights &lt;- prediction * (1 - prediction)
+  wlm_responses &lt;- reg + prediction_bias / wlm_weights # working responses
+  # Perform weighted least squares to obtain new point
+  betanew &lt;- lm.wfit(X, wlm_responses, wlm_weights)$coefficients 
+  # New direction is the vector difference
+  newthon_direction &lt;- betanew - beta0
+  # Output
+  newthon_direction
+}</code></pre>
+<pre class="r"><code>logit_newthon_fit &lt;- function(X, y, beta0, 
+                              save_values= TRUE, 
+                              linesearch = TRUE, 
+                              control = NULL, 
+                              ls_control = NULL) {
+  # Input type validation
+  stopifnot(
+    inherits(X, c(&quot;Matrix&quot;, &quot;matrix&quot;)), 
+    inherits(y, c(&quot;numeric&quot;, &quot;integer&quot;, &quot;boolean&quot;))
+  )
+  # Default controls and user values
+  maxit &lt;- 1e3
+  tol &lt;- 1e-11 # currently, only relative value convergence implemented |(fnew - fold) / fold| &lt; rtol
+  for (i in seq_along(names(control))) { 
+    assign(names(control)[i], control[[i]]) # overwrite default
+  }
+  # Define function to be optimized
+  f &lt;- function(beta) logloss(beta, X, y)
+  grad &lt;-  function(beta) logloss_grad(beta, X, y) # necessary for linesearch only
+  # Newthon descent
+  beta &lt;- beta0
+  fold &lt;- f(beta)
+  iter &lt;- 1
+  # -- main iteration
+  logloss_history &lt;- fold
+  step_size_history &lt;- 1
+  repeat {
+    newthon_direction &lt;- logit_newthon_direction(X, y, beta)
+    # Do linesearch if necessary
+    if (linesearch) {
+      btls &lt;- bt_linesearch(
+        x = beta, 
+        search_direction = newthon_direction, 
+        f = f, 
+        grad = grad, 
+        control = ls_control
+      )
+      step_size &lt;- btls$step_size
+    } else {
+      step_size &lt;- 1
+    }
+    beta &lt;- beta + step_size * newthon_direction
+    fnew &lt;- f(beta)
+    # Record values
+    logloss_history &lt;- c(logloss_history, fnew)
+    step_size_history &lt;- c(step_size_history, step_size)
+    # Check convergence
+    if (iter == maxit || fnew &lt; Inf &amp;&amp; abs((fnew - fold) / fold) &lt; tol) {
+      break
+    } else {
+      fold &lt;- fnew
+      iter &lt;- iter + 1
+    }
+  }
+  # output list
+  list(
+    beta = beta,
+    fitted_values = sigmoid(-as.numeric(X %*% beta)),
+    loglikelihood = -fnew,
+    iter = iter,
+    convergence = !(iter == maxit),
+    logloss_history = logloss_history,
+    step_size_history = step_size_history
+  )  
+}</code></pre>
+<pre class="r"><code># Test
+# mod &lt;- logit_newthon_fit(X, y, numeric(ncol(X)))
+# print(mod)</code></pre>
+</div>
 </div>
 </div>
 

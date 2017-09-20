@@ -118,7 +118,7 @@ wdbc <- read_csv(
   file = url("https://raw.githubusercontent.com/jgscott/SDS385/master/data/wdbc.csv"),
   col_names = FALSE
 )
-X <- cbind(1, wdbc[ ,3:4]) # 1 adds an intercept
+X <- cbind(1, scale(wdbc[ ,3:4])) # 1 adds an intercept
 X <- as.matrix(X) # for numerical algorithms
 y <- as.integer(wdbc[[2]] == "M")
 ```
@@ -251,6 +251,7 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
   gradval <- grad(x)
   graddir_prod <- crossprod(gradval, search_direction)
   # Main loop
+  i  <- 1
   step_size <- init_step_size
   repeat {
     newx <- x + step_size * search_direction
@@ -408,7 +409,9 @@ With 89.98% we weren't too far from the 93.15% accuracy; we can actually decreas
 
 #### (B) Newthon's Method
 
-To do a second order optimizatino method we need the Hessian matrix $\nabla^2_\beta l(\beta)$. Fortunately, it is easy to compute, since
+##### Newthon's minimization algorithm
+
+**Second order approximation** To do a second order optimizatino method we need the Hessian matrix $\nabla^2_\beta l(\beta)$. Fortunately, it is easy to compute, since
 $$
 \begin{aligned}
 \nabla^2_\beta l(\beta) &= \nabla_\beta \left( \nabla_\beta l(\beta) \right) \\
@@ -445,7 +448,7 @@ $$
 $$
 for working errors $\epsilon_i = w_i(\beta_0) - y_i$, weighted by $\alpha_i = (w_i(\beta)(1-w_i(\beta)))^{-1}$.
 
-*The algorithm*. Newthon's method for the minimum of a function $f\in C^2$ consists of approximation $f$ at a canditate solution $x_i$, using the second order taylor expansion 
+**The algorithm**. Newthon's method for the minimum of a function $f\in C^2$ consists of approximation $f$ at a canditate solution $x_i$, using the second order taylor expansion 
 $$
 f(x) \approx f(x_i) + \nabla f(x_i)^\top (x-x_i) + \frac{1}{2}(x - x_i)^\top\nabla^2 f(x_i)(x-x_i),
 $$
@@ -466,3 +469,102 @@ $$
 - (\nabla^2 f)^{-1}\nabla f(x_i).
 $$
 would be harder, and just like
+
+##### Implementation of Newthon's method in R
+
+```{r}
+logit_newthon_direction <- function(X, y, beta0) {
+  # Input type validation
+  stopifnot(
+    inherits(X, c("Matrix", "matrix")), 
+    inherits(y, c("numeric", "integer", "boolean"))
+  )
+  # Computations to obtain the working weights and responses for intermediate WLS
+  reg <- as.numeric(X %*% beta0) # Regression at beta0
+  prediction <- sigmoid(-reg) # Vector of current predictions
+  error <- prediction - y # prediction error
+  wlm_weights <- prediction * (1 - prediction)
+  wlm_responses <- reg - error / wlm_weights # working responses
+  # Perform weighted least squares to obtain new point
+  betanew <- lm.wfit(X, wlm_responses, wlm_weights)$coefficients 
+  # New direction is the vector difference
+  newthon_direction <- betanew - beta0
+  # Output
+  newthon_direction
+}
+```
+
+```{r}
+logit_newthon_fit <- function(X, y, beta0, 
+                              history = TRUE, 
+                              linesearch = TRUE, 
+                              control = NULL, 
+                              ls_control = NULL) {
+  # Input type validation
+  stopifnot(
+    inherits(X, c("Matrix", "matrix")), 
+    inherits(y, c("numeric", "integer", "boolean"))
+  )
+  # Default controls and user values
+  maxit <- 1e3
+  tol <- 1e-11 # currently, only relative value convergence implemented |(fnew - fold) / fold| < rtol
+  for (i in seq_along(names(control))) { 
+    assign(names(control)[i], control[[i]]) # overwrite default
+  }
+  # Define function to be optimized
+  f <- function(beta) logloss(beta, X, y)
+  grad <-  function(beta) logloss_grad(beta, X, y) # necessary for linesearch only
+  # Newthon descent
+  beta <- beta0
+  fold <- f(beta0)
+  iter <- 1
+  # -- main iteration
+  logloss_history <- fold
+  step_size_history <- 1
+  repeat {
+    newthon_direction <- logit_newthon_direction(X, y, beta)
+    # Do linesearch if necessary
+    if (linesearch) {
+      btls <- bt_linesearch(
+        x = beta, 
+        search_direction = newthon_direction, 
+        f = f, 
+        grad = grad, 
+        control = ls_control
+      )
+      step_size <- btls$step_size
+    } else {
+      step_size <- 1
+    }
+    beta <- beta + step_size * newthon_direction
+    fnew <- f(beta)
+    # Record values
+    logloss_history <- c(logloss_history, fnew)
+    step_size_history <- c(step_size_history, step_size)
+    # Check convergence
+    if (iter == maxit || fnew < Inf && abs((fnew - fold) / fold) < tol) {
+      break
+    } else {
+      fold <- fnew
+      iter <- iter + 1
+    }
+  }
+  # output list
+  list(
+    beta = beta,
+    fitted_values = sigmoid(-as.numeric(X %*% beta)),
+    loglikelihood = -fnew,
+    iter = iter,
+    convergence = !(iter == maxit),
+    logloss_history = logloss_history,
+    step_size_history = step_size_history
+  )  
+}
+```
+
+```{r}
+# Test
+mod <- logit_newthon_fit(X, y, numeric(ncol(X)))
+# print(mod)
+```
+

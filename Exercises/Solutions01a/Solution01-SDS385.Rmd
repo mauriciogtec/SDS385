@@ -312,22 +312,31 @@ We will code in R the proposed QR factorization for weighted least squares. We w
 **Programming our QR method**
 
 ```{r}
-wls_fit <- function(X, y, weights) {
-  N <- nrow(X)
-  X <- as.matrix(X) # this way it works for vector/matrix/data.frame
-  # 1: Prepare for QR
-  Xtilde <- X * sqrt(weights) # R is smart, multiplies every row like this
-  # 2: QR decomposition
-  qrdecomp <- qr(Xtilde, LAPACK = TRUE)
-  R <- qr.R(qrdecomp) # base qr fun is odd, qr.R recovers R from the odd form of qr
-  # 3: Get RHS of linear system
+#' @title Weighted Least Squares Regression by QR Factorization
+#' @description Uses QR factorization to solve fit the model
+#'   y_i ~ x_i'b,
+#' where the coefficients beta are obtained from the weighted least squares problem **min_b sum_i(w_i(y_i - x_i'b)^2)**
+#' @details This function uses matrix computations to fit the WLS model. The design matrix X must be a formal object of the package Matrix; these guarantees appropriate and efficient internal algorithms. The QR factorization is apply directly to X so that the resulting system is $$RX = Q'y$$ with X and Y reweighted by rows/entries according to the square roots of the weights vector.
+#' @params
+#'   X the design matrix of predictor/independent variable. It must inherit from the class Matrix of the Matrix package: rows will correspond to individuals and columns to variables. 
+#'   y a numeric vector containing the individual observations from the response/dependent variable   
+#'   weights a numeric vector of weights yo be assigned to each individual. Assigns equal weights by default.
+#' @value a vector with the values of the cofficients of the weighte least squares regression
+wls_qrfit <- function(X, y, weights = rep(1, length(y))) {
+  # Data type validation
+  stopifnot(
+    inherits(X, c("matrix", "Matrix")), # inherits allows class inheritence
+    is.numeric(y) && is.numeric(weights), # y and weights must be numeric;
+    !anyNA(X) && !anyNA(y) && !anyNA(weights), # NAs not allowed
+    nrow(X) == length(y) &&  nrow(X) == length(weights) # correct lengths
+  )
+  # 1. Set up as unweighted problem
+  Xtilde <- X * sqrt(weights) # I am using R's smart vectorized broadcasting rules
   ytilde <- y * sqrt(weights)
-  b <- t(Xtilde) %*% ytilde
-  # 4. Solve Step 1 of system
-  z <- forwardsolve(t(R), b)
-  # 5. Solve Step 2 of system
-  beta <- backsolve(R, z)
-  # Output
+  # 2. QR decomposition and system of equations
+  qrdecomp <- qr(Xtilde, LAPACK = TRUE)
+  # 3. Set up and solve the linear system
+  beta <- qr.coef(qrdecomp, ytilde) # solves Rx = Q'y as in OLS
   as.numeric(beta)
 }
 ```
@@ -335,11 +344,15 @@ wls_fit <- function(X, y, weights) {
 Just to tame sure it works fine, here's a comparison with the `lm` method using the famous iris database.
 
 ```{r}
+library(Matrix) # for the formal efficient Matrix class
+library(dplyr) # for the pipe operator
 data(iris)
-X <- iris[ ,c("Petal.Length", "Petal.Width")]
-y <- iris[ ,"Sepal.Width"]
+X <- iris %>% 
+  select(Petal.Length, Petal.Width) %>% 
+  as("Matrix") # convert to efficient S4 object from Matrix class
+y <- iris$Sepal.Width
 weights <- rep(1, nrow(X))
-wls_fit(X, y, weights)
+wls_qrfit(X, y, weights)
 ```
 
 ```{r}
@@ -355,14 +368,31 @@ Finally, for the sake of completion, I want to include what should be the fastes
 Matrix inversion is usually performed efficiently using the LU decomposition, which is a partial Gaussian elimination method. In R, inversion is done using the `solve` function without calling additional arguments. 
 
 ```{r}
-inv_fit <- function(X, y, weights) {
-  # system inputs
-  X <- as.matrix(X)
-  A <- t(X) %*% (X * weights) # system matrix
-  A_inv <- chol2inv(A) # inverse using cholesky, which exploits symmetric pos def
-  b <- t(X) %*% (y * weights) # right hand side of system
-  # solution
-  beta <- A_inv %*% b # system solution
+#' @title Weighted Least Squares Regression by Matrix Inversion
+#' @description Uses QR factorization to solve fit the model
+#'   y_i ~ x_i'b,
+#' where the coefficients beta are obtained from the weighted least squares problem **min_b sum_i(w_i(y_i - x_i'b)^2)**
+#' @details This function uses matrix computations to fit the WLS model. The design matrix X must be a formal object of the package Matrix; these guarantees appropriate and efficient internal algorithms. The function reweights X and y by rows/entries according to sqrt(weights), and solves (X'X)beta = X'y by inverting X'X using the cholesky decomposition of the Matrix package.
+#' @params
+#'   X the design matrix of predictor/independent variable. It must inherit from the class Matrix of the Matrix package: rows will correspond to individuals and columns to variables. 
+#'   y a numeric vector containing the individual observations from the response/dependent variable   
+#'   weights a numeric vector of weights yo be assigned to each individual. Assigns equal weights by default.
+#' @value a vector with the values of the cofficients of the weighte least squares regression
+wls_invfit <- function(X, y, weights) {
+  # Data type validation
+  stopifnot(
+    inherits(X, c("matrix", "Matrix")), # inherits allows class inheritence
+    is.numeric(y) && is.numeric(weights), # y and weights must be numeric;
+    !anyNA(X) && !anyNA(y) && !anyNA(weights), # NAs not allowed
+    nrow(X) == length(y) &&  nrow(X) == length(weights) # correct lengths
+  )
+  # 1. Set up as unweighted problem
+  Xtilde <- X * sqrt(weights) # I am using R's smart vectorized broadcasting rules
+  ytilde <- y * sqrt(weights)
+  # 2. Gaussian elimination for matrix inverse
+  inverse <- solve(crossprod(Xtilde)) # compute (X'X)^(-1)
+  # 3. Solve the linear system
+  beta <- inverse %*% (crossprod(Xtilde, ytilde)) # system solution
   # output
   as.numeric(beta)
 } 
@@ -371,7 +401,7 @@ inv_fit <- function(X, y, weights) {
 We get the same results as before:
 
 ```{r}
-inv_fit(X, y, weights)
+wls_invfit(X, y, weights)
 ```
 
 
@@ -385,13 +415,15 @@ library(microbenchmark)
 
 ```{r}
 data(iris)
-X <- as.matrix(iris[ ,c("Petal.Length", "Petal.Width")])
-y <- iris[ ,"Sepal.Width"]
+X <- iris %>% 
+  select(Petal.Length, Petal.Width) %>% 
+  as("Matrix") # convert to efficient S4 object from Matrix class
+y <- iris$Sepal.Width
 weights <- rep(1, nrow(X))
 microbenchmark(
-  inv_fit(X, y, weights),
-  wls_fit(X, y, weights),
-  lm.wfit(X, y, weights),
+  wls_qrfit(X, y, weights),
+  wls_invfit(X, y, weights),
+  lm.wfit(as.matrix(X), y, weights),
   times=100L
 )
 ```
@@ -403,19 +435,21 @@ For the first test, it seems that the inversion method is actually not bad at al
 Ok, so let's simulate a moderate dense database from a theoretical model.
 
 ```{r}
-N <- 1e4 # 10,000 observations
-d <- 1e2 # 100 variables
+N <- 1e3 # 10,000 observations
+d <- 1e3 # 100 variables
 beta <- rnorm(d) # random coefficients
 sigma <- .01 # error size
-# X <- matrix(rnorm(N * d), ncol = d) # very large random design matrix, size ~ 769.2MB
-# y <- X %*% beta + rnorm(N, sd = sigma)
-# weights <- rep(1, N)
-# microbenchmark( # now this will take a while
-#   inv_fit(X, y, weights),
-#   wls_fit(X, y, weights),
-#   lm.wfit(X, y, weights),
-#   times=10L
-# )
+X <- matrix(rnorm(N * d), ncol = d) %>% # very large random design matrix, size ~ 769.2MB
+  Matrix()
+y <- (X %*% beta + rnorm(N, sd = sigma)) %>% 
+  as.numeric()
+weights <- rep(1, N) 
+microbenchmark( # now this will take a while
+  wls_invfit(X, y, weights),
+  wls_qrfit(X, y, weights),
+  lm.wfit(as.matrix(X), y, weights),
+  times=3L
+)
 ```
 
 
@@ -445,7 +479,7 @@ sigma <- .01 # error size
 This is an example of **metaprogramming** and will allow us to mimic the behaviour of `lm`. We will also add a default intercept to the model which can be removed writing `-1` just like in `lm`.
 
 ```{r, warning=FALSE}
-wls <- function(model, data, weights = rep(1, nrow(data))) {
+wls <- function(model, data, weights = rep(1, nrow(data)), method = c("qr", "inverse")) {
   # some input validation
   stopifnot(is.numeric(weights), length(weights) == nrow(data))
   # make model a formula
@@ -474,7 +508,11 @@ wls <- function(model, data, weights = rep(1, nrow(data))) {
     }
   }
   # run the model 
-  beta <- wls_fit(X, y, weights)
+  beta <- switch(
+    method,
+    "qr" = wls_qrfit(X, y, weights),
+    "inverse" =  wls_invfit(X, y, weights)
+  )
   names(beta) <- names(X)
   # output
   out <- list(
@@ -539,7 +577,7 @@ In R, the library `Matrix` handles sparse matrices, having a special S4 class. F
 
 Let's save our sample sparse matrix in a variable `X`:
 
-```{r}
+```{r, cache=FALSE}
 library(Matrix)
 N <- 1e4
 d <- 1e3
@@ -559,7 +597,7 @@ We see above that the rows and columns are stores in the fields `i` and `p` of t
 
 **Methods for sparse matrices**. We will now write a few methods for sparse matrices. Basically, we will give the sparse versions of the previous methods.
 
-```{r}
+```{r, cache=FALSE}
 sparse_qr_fit <- function(sparseX, y, weights) {
   stopifnot(inherits(sparseX, "sparseMatrix")) # check if X is sparse
   N <- nrow(sparseX)
@@ -581,7 +619,7 @@ sparse_qr_fit <- function(sparseX, y, weights) {
 ```
 
 
-```{r}
+```{r, cache=TRUE}
 beta <- rnorm(d)
 err <- rnorm(N, 0, .01)
 y <- X %*% beta + err

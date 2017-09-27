@@ -1,10 +1,4 @@
 base
-rpart
-lattice
-RevoScaleR
-mrsdeploy
-MicrosoftML
-RevoMods
-RevoUtils
 RevoUtilsMath
 microbenchmark
+Matrix

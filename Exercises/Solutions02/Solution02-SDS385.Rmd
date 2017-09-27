@@ -1,0 +1,126 @@
+---
+title: "Solutions 02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(cache = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(Matrix)
+library(ggplot2)
+library(ggthemes)
+library(knitr)
+```
+
+
+```{r}
+sigmoid <- function(u) {
+  1 / (1 + exp(-u))
+}
+ll <- function(beta, X, y) {
+  yhat <- sigmoid(X %*% beta)
+  -sum(y*log(yhat) + (1 - y)*log(1 - yhat))
+}
+ll_grad <- function(beta, X, y) {
+   yhat <- sigmoid(X %*% beta) 
+   drop(crossprod(X, yhat - y))
+}
+```
+
+### An exploring procedure
+
+Before defining a proper function for fitting using stochastic gradient descent, let us produce a few plots to get a fill of the effects of different learning rates and batch sizes.
+
+```{r}
+dta <- read_csv("https://stats.idre.ucla.edu/stat/data/binary.csv")
+kable(head(dta)) # kable just prints nicer
+```
+```{r}
+X <- dta %>% 
+  select(gpa, gre) %>% 
+  scale() %>% 
+  as("Matrix")
+y <- dta %>% 
+  select(admit) %>% 
+  .[[1]]
+glm_coeffs <- glm.fit(X, y, family = binomial())$coefficients
+glm_ll <- ll(glm_coeffs, X, y)
+```
+
+```{r}
+logit_sgdfit_playground <- function(X, y, batch_size, step_size, niter) {
+  # Input data type validation
+  stopifnot(
+    inherits(X, c("Matrix", "matrix")), is.numeric(y), 
+    is.numeric(batch_size), is.numeric(step_size), is.numeric(niter),
+    length(batch_size) == 1, length(step_size) == 1, length(niter) ==1
+  )
+  # Initiate beta
+  N <- nrow(X)
+  p <- ncol(X)
+  beta <- numeric(p)
+  # Preallocate space for logloss history 
+  ll_hist <- numeric(niter)
+  # Main SGD iteration
+  for (t in 1:niter) {
+    batch <- sample.int(N, batch_size, replace = TRUE)
+    g <- ll_grad(beta, X[batch, ,drop = FALSE], y[batch]) / batch_size 
+    beta <- beta - step_size*g
+    ll_hist[t] <- ll(beta, X, y)
+  }
+  # Output logloss history and final coefficients
+  list(
+    coefficients = beta,
+    logloss_history = ll_hist
+  )
+}
+```
+
+```{r}
+n_dta_pts <- 1000
+step_sizes <- c(0.1, 0.05, 0.01)
+batch_sizes <- c(1, 10, 20)
+set.seed(110104) # for reproducibility, since algorithm is stochastic
+
+# try the algorithms for different batch sizes and fixes step sizes
+playground_results <-  data.frame()
+for (b in batch_sizes) {
+  for (s in step_sizes) {
+    out <- logit_sgdfit_playground(X, y, b, s, floor(n_dta_pts / b)) 
+    expanded_values <- out$logloss_history %>% 
+      lapply(function(value) rep(value, b)) %>% 
+      Reduce(c, .)
+    playground_results <- rbind(playground_results, data.frame(
+      data_pt = seq_along(expanded_values),
+      value = expanded_values,
+      batch_size = b,
+      step_size = s
+    ))    
+  }
+}
+```
+
+```{r, fig.width = 12, fig.height=8}
+# Plot the outcome with amazing ggplot
+playground_results <- playground_results %>% 
+  mutate(step_size = as.factor(paste("step size =", step_size))) %>% 
+  mutate(batch_size = as.factor(paste("batch size =", batch_size)))
+
+ggplot(playground_results) + 
+  geom_line(aes(x = data_pt, y = value, color = as.factor(batch_size))) +
+  ylim(268, 285) + ylab("logloss") + xlab("data points") +
+  geom_hline(aes(yintercept = glm_ll, linetype = "glm solution")) +
+  scale_colour_discrete("") +
+  scale_linetype_manual("", values = "dashed") +
+  theme_calc() + 
+  facet_grid(step_size ~ .) +
+  ggtitle("Convergence of SGD logit with example data and different step and batch sizes")
+
+```
+
+

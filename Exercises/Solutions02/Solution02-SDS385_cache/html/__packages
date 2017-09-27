@@ -1,0 +1,13 @@
+base
+RevoUtilsMath
+tidyverse
+ggplot2
+tibble
+tidyr
+readr
+purrr
+dplyr
+Matrix
+ggthemes
+bindrcpp
+knitr

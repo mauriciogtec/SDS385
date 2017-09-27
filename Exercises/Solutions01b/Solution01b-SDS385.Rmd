@@ -28,7 +28,7 @@ As an aside, if you have a favorite data set or problem that involves a differen
 
 Start by writing out the negative log likelihood
 $$
-l(\beta) = -log\left\{\prod_{i=1}^N p(y_i \mid \beta) \right\}
+l(\beta) = -\log\left\{\prod_{i=1}^N p(y_i \mid \beta) \right\}
 $$
 Simplify your expression as much as possible. This is the thing we want to minimize to compute the MLE. (By longstanding convention, we phrase optimization problems as minimization problems.) 
 
@@ -118,7 +118,7 @@ wdbc <- read_csv(
   file = url("https://raw.githubusercontent.com/jgscott/SDS385/master/data/wdbc.csv"),
   col_names = FALSE
 )
-X <- cbind(1, scale(wdbc[ ,3:4])) # 1 adds an intercept
+X <- cbind(1, wdbc[ ,3:10]) # 1 adds an intercept
 X <- as.matrix(X) # for numerical algorithms
 y <- as.integer(wdbc[[2]] == "M")
 ```
@@ -240,9 +240,9 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
   #
   # Initialize parameters (defaults/user)
   bt_rate <- 0.9
-  min_decrease_rate <- 0.5
+  min_decrease_rate <- 0.1
   init_step_size <- 1.0
-  maxit <- 100
+  maxit <- 1e4
   for (i in seq_along(names(control))) { # override defaults if user
     assign(names(control)[i], control[[i]]) 
   }
@@ -256,8 +256,8 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
   repeat {
     newx <- x + step_size * search_direction
     newvalue <- f(newx) 
-    min_decrease <- - min_decrease_rate * step_size * graddir_prod
-    if (i > maxit || newvalue <= val - min_decrease) {
+    min_decrease <-  max(-min_decrease_rate * step_size * graddir_prod,0)
+    if (i == maxit || newvalue < val - min_decrease) {
       break
     } else {
       step_size <- step_size * bt_rate
@@ -265,7 +265,8 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
     }
   }
   if (i == maxit) {
-    warning("max number of iterations reached in backtracking")
+    warning("no decreasing step found in search direction, assuming convergence")
+    step_size <- 0
   }
   # Output
   list(
@@ -346,8 +347,8 @@ I am gonna obtain our fitted values. Just to make sure I get the right answer, I
 
 ```{r, cache=FALSE}
 mod <- glm.fit(X, y, family = binomial())
-print(mod$coefficients) 
-prediction <- round(mod$fitted.values) 
+print(mod$coefficients)
+prediction <- round(mod$fitted.values)
 print(table(y, prediction))
 accuracy <- sum(y == prediction) / length(y)
 print(sprintf("The (rough) accuracy of the model is %.2f%%", 100 * accuracy))
@@ -473,7 +474,7 @@ would be harder, and just like
 ##### Implementation of Newthon's method in R
 
 ```{r}
-logit_newthon_direction <- function(X, y, beta0) {
+logit_newton_direction <- function(X, y, beta0) {
   # Input type validation
   stopifnot(
     inherits(X, c("Matrix", "matrix")), 
@@ -481,22 +482,22 @@ logit_newthon_direction <- function(X, y, beta0) {
   )
   # Computations to obtain the working weights and responses for intermediate WLS
   reg <- as.numeric(X %*% beta0) # Regression at beta0
-  prediction <- sigmoid(-reg) # Vector of current predictions
-  error <- prediction - y # prediction error
-  wlm_weights <- prediction * (1 - prediction)
-  wlm_responses <- reg - error / wlm_weights # working responses
+  w <- sigmoid(reg) # Vector of current predictions
+  error <- y - w  # prediction error
+  wlm_weights <- w * (1 - w)
+  wlm_responses <- reg + error / wlm_weights # working responses
   # Perform weighted least squares to obtain new point
   betanew <- lm.wfit(X, wlm_responses, wlm_weights)$coefficients 
   # New direction is the vector difference
-  newthon_direction <- betanew - beta0
+  newton_direction <- betanew - beta0
   # Output
-  newthon_direction
+  newton_direction
 }
 ```
 
 ```{r}
-logit_newthon_fit <- function(X, y, beta0, 
-                              history = TRUE, 
+logit_newton_fit <- function(X, y, beta0, 
+                              history = FALSE, 
                               linesearch = TRUE, 
                               control = NULL, 
                               ls_control = NULL) {
@@ -507,40 +508,51 @@ logit_newthon_fit <- function(X, y, beta0,
   )
   # Default controls and user values
   maxit <- 1e3
-  tol <- 1e-11 # currently, only relative value convergence implemented |(fnew - fold) / fold| < rtol
+  tol <- 1e-6 # currently, only relative value convergence implemented |(fnew - fold) / fold| < rtol
   for (i in seq_along(names(control))) { 
     assign(names(control)[i], control[[i]]) # overwrite default
   }
   # Define function to be optimized
   f <- function(beta) logloss(beta, X, y)
   grad <-  function(beta) logloss_grad(beta, X, y) # necessary for linesearch only
-  # Newthon descent
+  # Newton descent
   beta <- beta0
   fold <- f(beta0)
   iter <- 1
   # -- main iteration
-  logloss_history <- fold
-  step_size_history <- 1
+  if (history) {
+    logloss_history <- fold
+    step_size_history <- 1
+    accuracy_history <- .5 # random guess
+  }
+  
   repeat {
-    newthon_direction <- logit_newthon_direction(X, y, beta)
+    newton_direction <- logit_newton_direction(X, y, beta)
     # Do linesearch if necessary
     if (linesearch) {
       btls <- bt_linesearch(
-        x = beta, 
-        search_direction = newthon_direction, 
-        f = f, 
-        grad = grad, 
+        x = beta,
+        search_direction = newton_direction,
+        f = f,
+        grad = grad,
         control = ls_control
       )
       step_size <- btls$step_size
     } else {
       step_size <- 1
     }
-    beta <- beta + step_size * newthon_direction
+    beta <- beta + step_size*newton_direction
     fnew <- f(beta)
+    # Benchmarks
+    fitted_values <-  sigmoid(as.numeric(X %*% beta))
+    accuracy <- sum(round(fitted_values) == y) / length(y)
     # Record values
-    logloss_history <- c(logloss_history, fnew)
-    step_size_history <- c(step_size_history, step_size)
+    if (history) {
+      logloss_history <- c(logloss_history, fnew)
+      step_size_history <- c(step_size_history, step_size)
+      accuracy_history <- c(accuracy_history, accuracy)
+    }
+
     # Check convergence
     if (iter == maxit || fnew < Inf && abs((fnew - fold) / fold) < tol) {
       break
@@ -550,21 +562,42 @@ logit_newthon_fit <- function(X, y, beta0,
     }
   }
   # output list
-  list(
-    beta = beta,
-    fitted_values = sigmoid(-as.numeric(X %*% beta)),
+  output <- list(
+    coefficients = beta,
+    fitted_values = fitted_values,
+    accuracy = accuracy,
     loglikelihood = -fnew,
     iter = iter,
-    convergence = !(iter == maxit),
-    logloss_history = logloss_history,
-    step_size_history = step_size_history
+    convergence = !(iter == maxit)
   )  
+  if (history) {
+    output <- c(output, list(
+      logloss_history = logloss_history,
+      step_size_history = step_size_history,
+      accuracy_history = accuracy_history
+    ))
+  }
+  output
 }
 ```
 
 ```{r}
+system.time({
+  mod <- logit_newton_fit(X, y, numeric(ncol(X)), history = TRUE)
+})
+```
+
+```{r, fig.width=12}
 # Test
-mod <- logit_newthon_fit(X, y, numeric(ncol(X)))
-# print(mod)
+print(mod$coefficients)
+print(mod$loglikelihood)
+print(mod$accuracy)
+par(mfrow = c(2,3))
+plot(mod$fitted_values, y, xlab = "fitted", ylab = "y", main = "fitted vs predicted", pch = 21, cex = 2, bg = scales::alpha("blue", 0.15))
+hist(y - mod$fitted_values, xlab = "residuals", main = "residuals", col = scales::alpha("green", 0.2))
+plot(mod$fitted_values, y - mod$fitted_values, xlab = "fitted", ylab = "residuals", main = "residuals vs fited", cex = 2, pch = 21, bg = scales::alpha("red", 0.15))
+plot(mod$logloss_history, type = "l", col = "blue", xlab = "iter", main = "logloss value")
+plot(mod$step_size_history, type = "l", col = "red",  xlab = "iter", main = "step size")
+plot(mod$accuracy_history, type = "l", col = "green",  xlab = "iter", main = "accuracy per iteration")
 ```
 

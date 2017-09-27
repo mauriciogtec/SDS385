@@ -294,7 +294,7 @@ print(out$iter)
 print(out$converged)
 ```
 
-```{r}
+```{r, fig.width = 10}
 plot_data <- data.frame(
   iter = 1:length(out$ll_ewa_short_hist),
   short_ewa = out$ll_ewa_short_hist,

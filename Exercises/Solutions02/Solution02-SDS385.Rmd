@@ -223,7 +223,7 @@ logit_sgdfit <- function(X, y, control = NULL) {
   stopifnot(
     inherits(X, c("Matrix", "matrix")), is.numeric(y)
   )
-  # Set defaults for step_control and override with user values
+  # Set defaults and override with user control values
   tol <- 1e-6
   ewa_halflife_short <- 3 
   ewa_halflife_long <- 10 
@@ -232,15 +232,16 @@ logit_sgdfit <- function(X, y, control = NULL) {
   t0 <- 1
   maxit <- 1e4
   learning_rate <- 0.5
-  # for (i in seq_along(names(control))) { 
-  #   assign(names(control)[i], control[[i]]) # overwrite default
-  # }
+  for (i in seq_along(names(control))) {
+    assign(names(control)[i], control[[i]]) # overwrite default
+  }
   ewa_lambda_short <- log(2) / ewa_halflife_short 
   ewa_lambda_long <- log(2) / ewa_halflife_long
   # Initiate beta and ewa loglikelihood
   N <- nrow(X)
   p <- ncol(X)
   beta <- rnorm(p)
+  #
   ll_ewa_short <- ll(beta, X, y)
   ll_ewa_long <- 1.5*ll(beta, X, y)
   ll_ewa_short_hist <- ll_ewa_short

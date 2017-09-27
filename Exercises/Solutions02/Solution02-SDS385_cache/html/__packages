@@ -9,5 +9,5 @@ purrr
 dplyr
 Matrix
 ggthemes
-bindrcpp
 knitr
+bindrcpp

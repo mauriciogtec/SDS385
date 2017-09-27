@@ -48,7 +48,9 @@ y <- dta %>%
   select(admit) %>% 
   .[[1]]
 glm_coeffs <- glm.fit(X, y, family = binomial())$coefficients
+print(glm_coeffs)
 glm_ll <- ll(glm_coeffs, X, y)
+print(glm_ll)
 ```
 
 ```{r}
@@ -241,7 +243,8 @@ logit_sgdfit <- function(X, y, control = NULL) {
   beta <- rnorm(p)
   ll_ewa_short <- ll(beta, X, y)
   ll_ewa_long <- 1.5*ll(beta, X, y)
-  ll_ewa_hist <- ll_ewa_short
+  ll_ewa_short_hist <- ll_ewa_short
+  ll_ewa_long_hist <- ll_ewa_long
   # Main SGD iteration
   t <- 1
   repeat {
@@ -259,13 +262,15 @@ logit_sgdfit <- function(X, y, control = NULL) {
     }
     ll_ewa_short <- (1 - ewa_lambda_short)*ll_ewa_short + (ewa_lambda_short)*ll_new
     ll_ewa_long <- (1 - ewa_lambda_long)*ll_ewa_long + (ewa_lambda_long)*ll_new 
-    ll_ewa_hist <- c(ll_ewa_hist, ll_ewa_short)
+    ll_ewa_short_hist <- c(ll_ewa_short_hist, ll_ewa_short)
+    ll_ewa_long_hist <- c(ll_ewa_long_hist, ll_ewa_long)
     t <- t + 1
   }
   # Output logloss history and final coefficients
   list(
     coefficients = beta,
-    ll_ewa_hist = ll_ewa_hist,
+    ll_ewa_short_hist = ll_ewa_short_hist,
+    ll_ewa_long_hist = ll_ewa_long_hist,
     iter = t,
     converged = (t < maxit)
   )
@@ -276,7 +281,7 @@ logit_sgdfit <- function(X, y, control = NULL) {
 control <- list(
   tol = 1e-5,
   ewa_halflife_short = 3,
-  ewa_halflife_long = 6,
+  ewa_halflife_long = 10,
   batch_size = 1,
   C = .5,
   t0 = 2,
@@ -285,7 +290,21 @@ control <- list(
 )
 out <- logit_sgdfit(X, y, control = control) 
 print(out$coefficients)
+print(out$iter)
 print(out$converged)
-plot(out$ll_ewa_hist, type = "l", col = "blue")
+```
+
+```{r}
+plot_data <- data.frame(
+  iter = 1:length(out$ll_ewa_short_hist),
+  short_ewa = out$ll_ewa_short_hist,
+  long_ewa = out$ll_ewa_long_hist
+)
+plot_data <- gather(plot_data, ewa, value, -iter)
+ggplot(plot_data) +
+  geom_line(aes(x = iter, y = value, color = ewa)) +
+  ylim(265, 400) +
+  theme_calc() 
+  
 ```
 

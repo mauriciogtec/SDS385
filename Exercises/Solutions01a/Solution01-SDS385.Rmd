@@ -23,7 +23,7 @@ where $y \in \mathbb{R}^N$ is th vector of responses, and $X\in \mathbb{R}^{N\ti
 
 Let's say you trust the precision of some observations more than others, and therefore decide to estimate $\beta$ by the principle of weighted least squares (WLS):
 $$
-\beta = \arg\min_{\beta\in\mathbb{R}^N} \sum_{i=1}^N (y_i - x_i^\top\beta)^2,
+\beta = \arg\min_{\beta\in\mathbb{R}^N} \sum_{i=1}^N w_i(y_i - x_i^\top\beta)^2,
 $$
 where $w_i$ is the weight for observation $i$.
 </strong></em>

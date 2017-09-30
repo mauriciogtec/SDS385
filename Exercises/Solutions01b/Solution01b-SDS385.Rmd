@@ -246,7 +246,7 @@ We now program a first version of gradient descent without lineserach to get the
 #'   maxit: 10000, max number of iterations
 #'   tol: 1e-4, tolerance for relative convergence
 #'   history: TRUE, if TRUE saves all values of f during the iterations
-#'   step: 1 / sqrt(nrow(X)), learning rate
+#'   step: 1 / nrow(X), learning rate, dividing by nrow(X) helps with dimensionality issues 
 #' @value a list with 
 #'   optimizer: numeric vector that is a critical point of f
 #'   value: min value reachd
@@ -362,7 +362,7 @@ print(ourmod$coefficients) # not too far
 prediction <- round(ourmod$fitted_values)
 print(table(y, prediction))
 accuracy <- sum(y == prediction) / length(y)
-print(sprintf("The (rough) accuracy of the model is %.2f%%", 100 * accuracy))
+print(sprintf("The  accuracy of the model is %.2f%%", 100 * accuracy))
 ```
 
 We had an awesome accuracy rate of 94.20% in very little time. Although we did have to use a low tolerance value for convergence since the problem is not very well behaved. We plot the convergence of the loglikelihood.
@@ -387,7 +387,7 @@ print(mod$coefficients)
 prediction <- round(mod$fitted.values)
 print(table(y, prediction))
 accuracy <- sum(y == prediction) / length(y)
-print(sprintf("The (rough) accuracy of the model is %.2f%%", 100 * accuracy))
+print(sprintf("The  accuracy of the model is %.2f%%", 100 * accuracy))
 ```
 
 Doing a comparison, we see that our optimization result was fairly good.
@@ -402,9 +402,7 @@ print(comparison)
 
 #### (Bonus section) Including linesearch
 
-The cool thing about backtracking linesearch is that it is super easy to implement, it works not only for gradient descent, but any search direction method, and it will require a very small change to are gradient descent to incorporate.
-
-Let's define a function that fines a good step
+The cool thing about backtracking linesearch is that it is super easy to implement, it works not only for gradient descent, but any search direction method, and it will require a very small change to are gradient descent to incorporate. Let's find the good step.
 
 ```{r}
 #' @title Linesearch with Backtraking

@@ -695,7 +695,7 @@ Nvalue <- floor(10^seq(4, 6, by = 0.5)) # 100, 316, 1000, etc..
 sparsity <- c(.05, .25, .50, .75, 1) # used to create many zeros later in X later in the code
 # create a grid of combinations of sparsity and N, and an instructions if whether use the sparse verion
 time_grid_N_sparse <- expand.grid(
-  sparsity = sparsity, 
+  sparse_rate = sparsity, 
   Nvalue = Nvalue, 
   use_sparse = c(TRUE, FALSE)
 )
@@ -703,7 +703,7 @@ time_grid_N_sparse$qr_time_sparse <- 0
 time_grid_N_sparse$inv_time_sparse <- 0
 for (i in 1:nrow(time_grid_N_sparse)) {
   n <- time_grid_N_sparse$Nvalue[i]
-  s <- time_grid_N_sparse$sparsity[i]
+  s <- time_grid_N_sparse$sparse_rate[i]
   use_sparse <- time_grid_N_sparse$use_sparse[i]
   mask <- rbinom(n * P, 1, s)
   # this line will create assign a class to X that will determine if uses sparse algorithms or not
@@ -725,6 +725,7 @@ saveRDS(time_grid_N_sparse, file = "myCache/benchmarkNvalueSparse.RDS")
 ```
 
 ```{r, include = FALSE}
+sparsity <- c(.05, .25, .50, .75, 1)
 time_grid_N_sparse <- readRDS("myCache/benchmarkNvalueSparse.RDS")
 ```
 
@@ -740,12 +741,12 @@ We now plot the results; as expected, non-sparse method behave the same independ
 ```{r}
 plot_data <- time_grid_N_sparse %>% 
   mutate(logN = log(Nvalue, 10)) %>% 
-  mutate(sparsity = ordered(sparsity, levels = .GlobalEnv$sparsity)) %>% 
   select(-Nvalue) %>% 
-  gather(method, seconds, -c(logN, sparsity, use_sparse)) 
+  mutate(sparse_rate = ordered(time_grid_N_sparse$sparse_rate, levels = sparsity)) %>% 
+  gather(method, seconds, -c(logN, sparse_rate, use_sparse)) 
 ggplot(plot_data) +
   geom_line(aes(x = logN, y = seconds, colour = method, linetype = use_sparse), size = 1) +
-  facet_grid(sparsity ~ .) +
+  facet_grid(sparse_rate ~ .) +
   scale_colour_discrete(labels = c("Full Inverse", "QR")) +
   scale_linetype_discrete(labels = c("No", "Yes")) +
   ggtitle("Effect of increasing N with P = 9 fixed, by sparsity level") + 
@@ -754,14 +755,22 @@ ggplot(plot_data) +
 
 
 
-
-
 ### A bonus section: how to code a function that feels like `lm` in R
 
 
 This is an example of **metaprogramming** and will allow us to mimic the behaviour of `lm`. We will also add a default intercept to the model which can be removed writing `-1` just like in `lm`.
 
-```{r, warning=FALSE}
+```{r}
+#' @title Weighted Least Squares 
+#' @description 
+#' Fits the model
+#'   y_i ~ x_i'b,
+#' where the coefficients beta are obtained from the weighted least squares problem **min_b sum_i(w_i(y_i - x_i'b)^2)**
+#' @params
+#'   model: a character or formula input specifying a model, use y ~ x - 1 to remove the intercept
+#'   data: a data.frame containing the variables of the formula, the data must have numeric columns only
+#'   weights: a numeric vector of weights yo be assigned to each individual. Assigns equal weights by default.
+#' @value a list with the model and numeric vector of cofficients of the weighted least squares regression
 wls <- function(model, data, weights = rep(1, nrow(data)), method = c("qr", "inverse")) {
   # some input validation
   stopifnot(is.data.frame(data), is.numeric(weights))
@@ -777,9 +786,8 @@ wls <- function(model, data, weights = rep(1, nrow(data)), method = c("qr", "inv
   } else {
     remove_intercept <- grepl("-(.*?)1", rhs) # do we need intercept?
     if (remove_intercept) {
-      rhs <- gsub("[ ]+(.*?)1", "", rhs) # get rid of intercept indication
+      rhs <- gsub("[ ]+-(.*?)1", "", rhs) # get rid of intercept indication
       var_names <- strsplit(rhs, "[ ]+[\\+][ ]+")[[1]] # regexps are awesome!
-      print(var_names)
       X <- data[ ,names(data) %in% var_names, drop = FALSE]
     } else {
       var_names <- strsplit(rhs, "[ ]+[\\+][ ]+")[[1]] # regexps are awesome!

@@ -648,27 +648,27 @@ logit_newton_fit <- function(X, y,
     step_hist = step_hist,
     accuracy_hist = accuracy_hist
   )
-
 }
 ```
 
 ```{r}
 control <- list(
-  tol = 1e-8
+  tol = 1e-11
 )
 algotime <- system.time({
-  mod <- logit_newton_fit(X, y, history = TRUE)
+  mod <- logit_newton_fit(X, y, control = control, history = TRUE)
 })
 print(algotime)
+print(paste("The algorithm converge in only", mod$iter, "iterations!"))
+print(mod$coefficients)
+print(mod$loglikelihood)
+print(paste("The model reached an accuracy of", scales::percent(mod$accuracy), "in prediction!"))
 ```
 
-In the following plot, we will see that as expected, the step size remained of size one. Newton has a natural step size of one within its convergence region.
+In the following plot, we will see that--as expected--the step size remained of size one. Newton has a natural step size of one within its convergence region.
 
 ```{r, fig.width=12}
 # Test
-print(mod$coefficients)
-print(mod$loglikelihood)
-print(mod$accuracy)
 par(mfrow = c(2,3))
 plot(mod$fitted_values, y, xlab = "fitted", ylab = "y", main = "fitted vs predicted", pch = 21, cex = 2, bg = scales::alpha("blue", 0.15))
 hist(y - mod$fitted_values, xlab = "residuals", main = "residuals", col = scales::alpha("green", 0.2))

@@ -6,7 +6,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
-knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(cache = TRUE)
 ```
 
 ```{r}
@@ -32,9 +32,8 @@ ll_grad <- function(beta, X, y) {
 }
 ```
 
-### An exploring procedure
+### Playground 1: the batch and step size effect
 
-Before defining a proper function for fitting using stochastic gradient descent, let us produce a few plots to get a fill of the effects of different learning rates and batch sizes.
 
 ```{r}
 dta <- read_csv("https://stats.idre.ucla.edu/stat/data/binary.csv")
@@ -49,21 +48,21 @@ y <- dta %>%
   select(admit) %>% 
   .[[1]]
 glm_coeffs <- glm.fit(X, y, family = binomial())$coefficients
+print(glm_coeffs)
 glm_ll <- ll(glm_coeffs, X, y)
+print(glm_ll)
 ```
 
 ```{r}
 logit_sgdfit_playground <- function(X, y, batch_size, step_size, niter) {
   # Input data type validation
   stopifnot(
-    inherits(X, c("Matrix", "matrix")), is.numeric(y), 
-    is.numeric(batch_size), is.numeric(step_size), is.numeric(niter),
-    length(batch_size) == 1, length(step_size) == 1, length(niter) ==1
+    inherits(X, c("Matrix", "matrix")), is.numeric(y)
   )
   # Initiate beta
   N <- nrow(X)
   p <- ncol(X)
-  beta <- numeric(p)
+  beta <- rnorm(p)
   # Preallocate space for logloss history 
   ll_hist <- numeric(niter)
   # Main SGD iteration
@@ -82,7 +81,7 @@ logit_sgdfit_playground <- function(X, y, batch_size, step_size, niter) {
 ```
 
 ```{r}
-n_dta_pts <- 1000
+n_dta_pts <- 2400
 step_sizes <- c(0.1, 0.05, 0.01)
 batch_sizes <- c(1, 10, 20)
 set.seed(110104) # for reproducibility, since algorithm is stochastic
@@ -91,6 +90,7 @@ set.seed(110104) # for reproducibility, since algorithm is stochastic
 playground_results <-  data.frame()
 for (b in batch_sizes) {
   for (s in step_sizes) {
+    set.seed(110104) # for reproducibility, since algorithm is stochastic
     out <- logit_sgdfit_playground(X, y, b, s, floor(n_dta_pts / b)) 
     expanded_values <- out$logloss_history %>% 
       lapply(function(value) rep(value, b)) %>% 
@@ -103,17 +103,16 @@ for (b in batch_sizes) {
     ))    
   }
 }
+playground_results <- playground_results %>% 
+  mutate(step_size = as.factor(paste("step size =", step_size))) %>% 
+  mutate(batch_size = as.factor(paste("batch size =", batch_size)))
 ```
 
 ```{r, fig.width = 12, fig.height=8}
 # Plot the outcome with amazing ggplot
-playground_results <- playground_results %>% 
-  mutate(step_size = as.factor(paste("step size =", step_size))) %>% 
-  mutate(batch_size = as.factor(paste("batch size =", batch_size)))
-
 ggplot(playground_results) + 
   geom_line(aes(x = data_pt, y = value, color = as.factor(batch_size))) +
-  ylim(268, 285) + ylab("logloss") + xlab("data points") +
+  ylim(268, 600) + ylab("logloss") + xlab("data points") +
   geom_hline(aes(yintercept = glm_ll, linetype = "glm solution")) +
   scale_colour_discrete("") +
   scale_linetype_manual("", values = "dashed") +
@@ -123,4 +122,190 @@ ggplot(playground_results) +
 
 ```
 
+### The Robbins-Monto playground
+
+
+```{r}
+robbins_monro_step <- function(t, learning_rate, C, t0) {
+  C / (t + t0)^learning_rate
+}
+```
+
+```{r}
+logit_sgdfit_playground2 <- function(X, y, batch_size, niter, step_control = NULL) {
+  # Input data type validation
+  stopifnot(
+    inherits(X, c("Matrix", "matrix")), is.numeric(y)
+  )
+  # Set defaults for step_control and override with user values
+  C <- .5
+  t0 <- 1
+  learning_rate <- 0.5
+  for (i in seq_along(names(step_control))) { 
+    assign(names(step_control)[i], step_control[[i]]) # overwrite default
+  }
+  # Initiate beta
+  N <- nrow(X)
+  p <- ncol(X)
+  beta <- rnorm(p)
+  # Preallocate space for logloss history 
+  ll_hist <- numeric(niter)
+  # Main SGD iteration
+  for (t in 1:niter) {
+    batch <- sample.int(N, batch_size, replace = TRUE)
+    g <- ll_grad(beta, X[batch, ,drop = FALSE], y[batch]) / batch_size 
+    step_size <- robbins_monro_step(t, learning_rate, C, t0)  
+    beta <- beta - step_size*g
+    ll_hist[t] <- ll(beta, X, y)
+  }
+  # Output logloss history and final coefficients
+  list(
+    coefficients = beta,
+    logloss_history = ll_hist
+  )
+}
+```
+
+```{r}
+n_dta_pts <- 2400
+learning_rates <- c(0.1, 0.5, 0.75, 1)
+batch_sizes <- c(1, 10, 20)
+C <- c(.25, .5)
+
+# try the algorithms for different batch sizes and fixes step sizes
+playground_results2 <-  data.frame()
+for (b in batch_sizes) {
+  for (alpha in learning_rates) {
+    for (const in C) {
+      set.seed(110104) # for reproducibility, since algorithm is stochastic
+      step_control <- list(C = const, t0 = 2, learning_rate = alpha)
+      out <- logit_sgdfit_playground2(X, y, b, floor(n_dta_pts / b), step_control) 
+      expanded_values <- out$logloss_history %>% 
+        lapply(function(value) rep(value, b)) %>% 
+        Reduce(c, .)
+      playground_results2 <- rbind(playground_results2, data.frame(
+        data_pt = seq_along(expanded_values),
+        value = expanded_values,
+        batch_size = b,
+        learning_rate = alpha,
+        C = const
+      ))      
+    }
+  }
+}
+playground_results2 <- playground_results2 %>% 
+  mutate(batch_size = as.factor(paste("batch size =", batch_size))) %>% 
+  mutate(learning_rate = as.factor(paste("learning_rate =", learning_rate)))  %>% 
+  mutate(C = as.factor(paste("C =", C)))
+```
+
+
+
+```{r, fig.width = 12, fig.height=10}
+# Plot the outcome with amazing ggplot
+ggplot(playground_results2) + 
+  geom_line(aes(x = data_pt, y = value, color = as.factor(batch_size))) +
+  ylim(268, 600) + ylab("logloss") + xlab("data points") +
+  geom_hline(aes(yintercept = glm_ll, linetype = "glm solution")) +
+  scale_colour_discrete("") +
+  scale_linetype_manual("", values = "dashed") +
+  theme_calc() + 
+  facet_grid(learning_rate ~ C) +
+  ggtitle("Convergence of SGD logit with with example data and Robbins-Monro step with different learning rates")
+
+```
+
+### An implementation with convergence detection
+
+```{r}
+logit_sgdfit <- function(X, y, control = NULL) {
+  # Input data type validation
+  stopifnot(
+    inherits(X, c("Matrix", "matrix")), is.numeric(y)
+  )
+  # Set defaults and override with user control values
+  tol <- 1e-6
+  ewa_halflife_short <- 3 
+  ewa_halflife_long <- 10 
+  batch_size <- 1
+  C <- .5
+  t0 <- 1
+  maxit <- 1e4
+  learning_rate <- 0.5
+  for (i in seq_along(names(control))) {
+    assign(names(control)[i], control[[i]]) # overwrite default
+  }
+  ewa_lambda_short <- log(2) / ewa_halflife_short 
+  ewa_lambda_long <- log(2) / ewa_halflife_long
+  # Initiate beta and ewa loglikelihood
+  N <- nrow(X)
+  p <- ncol(X)
+  beta <- rnorm(p)
+  #
+  ll_ewa_short <- ll(beta, X, y)
+  ll_ewa_long <- 1.5*ll(beta, X, y)
+  ll_ewa_short_hist <- ll_ewa_short
+  ll_ewa_long_hist <- ll_ewa_long
+  # Main SGD iteration
+  t <- 1
+  repeat {
+    batch <- sample.int(N, batch_size, replace = TRUE)
+    g <- ll_grad(beta, X[batch, ,drop = FALSE], y[batch]) / batch_size 
+    step_size <- robbins_monro_step(t, learning_rate, C, t0)  
+    beta <- beta - step_size*g
+    ll_new <- ll(beta, X, y)
+    if (abs((ll_ewa_short - ll_ewa_long) / ll_ewa_long) < tol) {
+      break
+    }
+    if (t == maxit) {
+      warning("max number of iterations reached")
+      break
+    }
+    ll_ewa_short <- (1 - ewa_lambda_short)*ll_ewa_short + (ewa_lambda_short)*ll_new
+    ll_ewa_long <- (1 - ewa_lambda_long)*ll_ewa_long + (ewa_lambda_long)*ll_new 
+    ll_ewa_short_hist <- c(ll_ewa_short_hist, ll_ewa_short)
+    ll_ewa_long_hist <- c(ll_ewa_long_hist, ll_ewa_long)
+    t <- t + 1
+  }
+  # Output logloss history and final coefficients
+  list(
+    coefficients = beta,
+    ll_ewa_short_hist = ll_ewa_short_hist,
+    ll_ewa_long_hist = ll_ewa_long_hist,
+    iter = t,
+    converged = (t < maxit)
+  )
+}
+```
+
+```{r}
+control <- list(
+  tol = 1e-5,
+  ewa_halflife_short = 3,
+  ewa_halflife_long = 10,
+  batch_size = 1,
+  C = .5,
+  t0 = 2,
+  maxit = 1e4,
+  learning_rate = 0.5
+)
+out <- logit_sgdfit(X, y, control = control) 
+print(out$coefficients)
+print(out$iter)
+print(out$converged)
+```
+
+```{r, fig.width = 10}
+plot_data <- data.frame(
+  iter = 1:length(out$ll_ewa_short_hist),
+  short_ewa = out$ll_ewa_short_hist,
+  long_ewa = out$ll_ewa_long_hist
+)
+plot_data <- gather(plot_data, ewa, value, -iter)
+ggplot(plot_data) +
+  geom_line(aes(x = iter, y = value, color = ewa)) +
+  ylim(265, 400) +
+  theme_calc() 
+  
+```
 

@@ -15,6 +15,6 @@ My solutions are in html, created with RMarkdown (even if there's no R formulas,
 Unfortuntaley, Github is not as friendly with Rmd as it is with Jupyter notebooks, say..., so I created a Github Page at
 [mauriciogtec.github.io/SDS385](https://mauriciogtec.github.io/SDS385), so that you can see the pretty html version. Below are also **direct links**:
 
-* [`Solution01`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions01a/Solution01-SDS385.html)
-* [`Solution02`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions01b/Solution01b-SDS385.html)
-
+* [`Solution01a`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions01a/Solution01-SDS385.html)
+* [`Solution01b`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions01b/Solution01b-SDS385.html)
+* [`Solution02`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions02/Solution02-SDS385.html)

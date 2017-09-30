@@ -1280,7 +1280,6 @@ wls &lt;- function(model, data, weights = rep(1, nrow(data)), method = c(&quot;q
     remove_intercept &lt;- grepl(&quot;-(.*?)1&quot;, rhs) # do we need intercept?
     if (remove_intercept) {
       rhs &lt;- gsub(&quot;[ ]+-(.*?)1&quot;, &quot;&quot;, rhs) # get rid of intercept indication
-      print(rhs)
       var_names &lt;- strsplit(rhs, &quot;[ ]+[\\+][ ]+&quot;)[[1]] # regexps are awesome!
       X &lt;- data[ ,names(data) %in% var_names, drop = FALSE]
     } else {
@@ -1325,7 +1324,6 @@ wls &lt;- function(model, data, weights = rep(1, nrow(data)), method = c(&quot;q
 ##       3.5870       -0.2571        0.3640</code></pre>
 <p>No intercept:</p>
 <pre class="r"><code>wls(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris)</code></pre>
-<pre><code>## [1] &quot;Petal.Length + Petal.Width&quot;</code></pre>
 <pre><code>## $model
 ## Sepal.Width ~ Petal.Length + Petal.Width - 1
 ## 

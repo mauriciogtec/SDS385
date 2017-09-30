@@ -127,7 +127,7 @@ The varible $X$ will store 10 features and $y$ the outcome, where $y = 1$ if the
 $$
 x^j \leftarrow \frac{x^j - \mathrm{mean}(x^j)}{\mathrm{stdev}(x^j)},
 $$
-this will make all columns centered (zero mean) and scaled (standard deviation one). This helps a lot to improve the performance of algorithms since the resultant likelihood is better behaved. This might not be necessary for more advanced optimization methods, such as Newthon's method, but is is necessary for gradient descent.
+this will make all columns centered (zero mean) and scaled (standard deviation one). This helps a lot to improve the performance of algorithms since the resultant likelihood is better behaved. This might not be necessary for more advanced optimization methods, such as Newton's method, but is is necessary for gradient descent.
 
 
 ```{r, warning=FALSE, message=FALSE}
@@ -476,9 +476,9 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
 
 Now let's do the very small modification to our previous gradient descent function. The bonimial fitting function will only change in that it will include an arguments for lineserach controls.
 
-#### (B) Newthon's Method
+#### (B) Newton's Method
 
-##### Newthon's minimization algorithm
+##### Newton's minimization algorithm
 
 For simplicity of presentation, I will assumme that $m_i = 1$ for the rest of this section.
 
@@ -519,7 +519,7 @@ $$
 $$
 for working errors $\epsilon_i = w_i(\beta_0) - y_i$, weighted by $\alpha_i = (w_i(\beta)(1-w_i(\beta)))^{-1}$.
 
-**The algorithm**. Newthon's method for the minimum of a function $f\in C^2$ consists of approximation $f$ at a canditate solution $x_i$, using the second order taylor expansion
+**The algorithm**. Newton's method for the minimum of a function $f\in C^2$ consists of approximation $f$ at a canditate solution $x_i$, using the second order taylor expansion
 $$
 f(x) \approx f(x_i) + \nabla f(x_i)^\top (x-x_i) + \frac{1}{2}(x - x_i)^\top\nabla^2 f(x_i)(x-x_i),
 $$
@@ -529,7 +529,7 @@ x_{i + 1} = x_i - (\nabla^2 f)^{-1}\nabla f(x_i).
 $$
 It can be proved that under our assumptions of smoothness,  there exists a radius near every local minimizer $x^*$, in which the of convergence $x_i \to x^*$ is guaranteed, and has a quadratic rate.
 
-**Slight improvement**. We recognize that $-(\nabla^2 f)^{-1}\nabla f(x_i)$ is a direction in which we are moving to find an optimal solution. Could we take shorter or longer steps in this direction? The answer is: Newthon's method has a natural step/learning rate of one, since the quadratic converge is guaranteed once one is sufficiently closed to an optimizer. However, one could try to do smaller or larger steps at the beginning, to make sure the function is actually decreasing enough. The strategies to a find a step size are the same as in the gradient descent case.
+**Slight improvement**. We recognize that $-(\nabla^2 f)^{-1}\nabla f(x_i)$ is a direction in which we are moving to find an optimal solution. Could we take shorter or longer steps in this direction? The answer is: Newton's method has a natural step/learning rate of one, since the quadratic converge is guaranteed once one is sufficiently closed to an optimizer. However, one could try to do smaller or larger steps at the beginning, to make sure the function is actually decreasing enough. The strategies to a find a step size are the same as in the gradient descent case.
 
 **Summary of the method for logistic regression**. In the beginning of this section we noticed that the problem of finding the new $x_{i+1}$ is equivalent to solving a weighted least square problem of the form
 $$
@@ -545,7 +545,7 @@ $$
 $$
 where $\tilde{W}_i$ and $z$ depend on $\hat{\beta}_i$.
 
-##### Implementation of Newthon's method in R
+##### Implementation of Newton's method in R
 
 We could implement Newton's method in one simple function, but to be better protected to errors, we use linesearch too, so we first estimate the Newton direction and then mode in that direction with linesearch.
 

@@ -230,7 +230,7 @@ logloss_grad <- function(beta, X, y, m = 1) {
 }
 ```
 
-##### Gradient Descent without linesearch
+##### (B) Gradient Descent (without linesearch)
 
 We now program a first version of gradient descent without lineserach to get the idea clear:
 
@@ -476,9 +476,7 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
 
 Now let's do the very small modification to our previous gradient descent function. The bonimial fitting function will only change in that it will include an arguments for lineserach controls.
 
-#### (B) Newton's Method
-
-##### Newton's minimization algorithm
+#### (C) Quadratic Approximation
 
 For simplicity of presentation, I will assumme that $m_i = 1$ for the rest of this section.
 
@@ -531,7 +529,7 @@ It can be proved that under our assumptions of smoothness,  there exists a radiu
 
 **Slight improvement**. We recognize that $-(\nabla^2 f)^{-1}\nabla f(x_i)$ is a direction in which we are moving to find an optimal solution. Could we take shorter or longer steps in this direction? The answer is: Newton's method has a natural step/learning rate of one, since the quadratic converge is guaranteed once one is sufficiently closed to an optimizer. However, one could try to do smaller or larger steps at the beginning, to make sure the function is actually decreasing enough. The strategies to a find a step size are the same as in the gradient descent case.
 
-**Summary of the method for logistic regression**. In the beginning of this section we noticed that the problem of finding the new $x_{i+1}$ is equivalent to solving a weighted least square problem of the form
+**Summary of the method for Newton's method in our logistic regression**. In the beginning of this section we noticed that the problem of finding the new $x_{i+1}$ is equivalent to solving a weighted least square problem of the form
 $$
 l(\beta) = \frac{1}{2}\left(X\beta - z\right)^\top\tilde{W}\left(X\beta - z\right).
 $$
@@ -545,7 +543,7 @@ $$
 $$
 where $\tilde{W}_i$ and $z$ depend on $\hat{\beta}_i$.
 
-##### Implementation of Newton's method in R
+### (D) & (E) Implementation of Newton's method in R
 
 We could implement Newton's method in one simple function, but to be better protected to errors, we use linesearch too, so we first estimate the Newton direction and then mode in that direction with linesearch.
 

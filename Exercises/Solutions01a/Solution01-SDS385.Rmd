@@ -253,7 +253,7 @@ Note that algorithms will be classified on whether they compute $X^\top W X$ fir
 
 If $N$ is similar to $P$, then Cholesky and QR require about the same amount of work. This is because although Cholesky is faster, the extra cost of computing $X^\top W X$ compensates the advantages. However, if $N >> P$, we expect the QR factorization to be as much as twice the work. Choosing a method depends on how well-conditioned the problem is. The SVD is known to be the most stable, but it is many times more expensive; if $X$ is rank-defficient, this might be the only way (although having $X$ rank-defficient may have us reconsidering if least squares is the best approach).
 
-#### Part II of solution: Implementing the QR factorization
+#### Part II of solution: The QR factorization for WLS
 
 **Using the the QR decomposition for WLS**. First of all, let us recall that we only need solve the case where $W$ is $I_N$ the identity matrix, since in any other case, we can define $\tilde{X} = W^{1/2} X$ and $\tilde{y} = W^{1/2}y$ and the normal equations system becomes
 $$
@@ -314,7 +314,10 @@ As mentioned before, parts 2-4 will be implemented in a single step using the $q
 *Note*: The only differnece with a version for sparse matrices would be to use the $Q$-less $QR$ decomposition instead and solving the double triangular system as commented above. Again, this is already included is efficient solvers for sparse matrices in most languages. We will talk more about sparse matrices and define them in following sections.
 
 
-### (C) Coding and testing with simulated and iris data
+
+### (C) Coding and testing the method
+
+***Code up functions that implement both the inversion method and your method for an arbitrary $X$, $y$, and weights $W$.Now simulate some silly data from the linear model for a range of values of $N$ and $$. (Feel free to assume that the weights wi are all 1.) It doesn’t matter how you do this—e.g. everything can be Gaussian if you want. (We’re not concerned with statistical principles yet, just with algorithms, and using least squares is a pretty terrible idea for enormous linear models, anyway.) Just make sure that you explore values of P up into the thousands, and that $N$ > $P$. Benchmark the performance of the inversion solver and your solver across a range of scenarios.***
 
 We now directly implement the recipe we gave in the previous section.
 
@@ -378,11 +381,6 @@ lm.wfit(X, y , weights) %>% # note that lm.wfit does not behave well with packag
   .[["coefficients"]] %>% # since output is a list, this extracts coefficients
   print()
 ```
-
-
-In the next bonus subsection we define a `wls` function that calls `wls_qrfit` but receives a formula just like R's `lm`. This is similar to what `lm` method does calling the`lm.fit` function. This is not part of the homework, so the reader may skip it. It is just fun.
-
-Finally, for the sake of completion, I want to include what should be the fastest, the Cholesky decomposition $(X^\top W X)=LL^\top$. I want go through the exact details but is similar to what we've done using triangular systems.
 
 **Comparisons with the inversion method and R's default functions**
 
@@ -461,52 +459,39 @@ weights <- rep(1, N)
 
 
 ```{r, eval = FALSE}
-Nvalue <- floor(10^seq(1, 6, by = 0.5)) # 10, 31, 100, 316, etc..
-qr_time <- numeric(length(Nvalue))
-inv_time <- numeric(length(Nvalue))
-for (i in seq_along(Nvalue)) {
+time_grid_N <- data.frame(
+  Nvalue = floor(10^seq(2, 6, by = 0.5)) # 10, 31, 100, 316, etc..
+)
+time_grid_N$qr_time <- 0
+time_grid_N$inv_time <- 0
+for (i in 1:nrow(time_grid_N)) {
   n <- Nvalue[i]
   t_qr <- microbenchmark(wls_qrfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 10L)
   t_inv <- microbenchmark(wls_invfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 10L)
-  qr_time[i] <- mean(t_qr$time)  / 1e9
-  inv_time[i] <- mean(t_inv$time)  / 1e9
+  time_grid_N$qr_time[i] <- mean(t_qr$time)  / 1e9
+  time_grid_N$inv_time[i] <- mean(t_inv$time)  / 1e9
 }
 ```
 
 We print the comparison of the methods
 
 ```{r, eval = FALSE, include = FALSE}
-resultsNvalue <- list(
-  qr_time = qr_time,
-  inv_time = inv_time,
-  Nvalue = Nvalue,
-  p = p
-)
-saveRDS(resultsNvalue, file = "myCache/benchmarkNvalue.RDS")
+saveRDS(time_grid_N, file = "myCache/benchmarkNvalue.RDS")
 ```
 
 ```{r, include = FALSE}
-resultsNvalue <- readRDS("myCache/benchmarkNvalue.RDS")
-for (i in 1:length(resultsNvalue)) {
-  assign(names(resultsNvalue)[i], resultsNvalue[[i]])
-}
+time_grid_N <- readRDS("myCache/benchmarkNvalue.RDS")
 ```
 
 ```{r}
-data_frame(
-  N = scales::comma(Nvalue),
-  QR = paste0(qr_time, "s"),
-  `Full Inversion` = paste0(inv_time, "s")
-) %>% 
+time_grid_N %>% 
   knitr::kable(align = "rrr") # for nice table format in rmarkdown
 ```
 
 ```{r}
-plot_data <- data.frame(
-  logN = log(Nvalue, 10),
-  qr_time = qr_time,
-  inv_time = inv_time
-) %>% 
+plot_data <- time_grid_N_sparse %>% 
+  mutate(logN = log(Nvalue, 10)) %>% 
+  select(-Nvalue) %>% 
   gather(method, seconds, -logN)
 ggplot(plot_data, aes(x = logN, y = seconds, colour = method)) +
   geom_line(size = 1) +
@@ -514,7 +499,7 @@ ggplot(plot_data, aes(x = logN, y = seconds, colour = method)) +
   ggtitle("Effect of increasing N with P = 9 fixed") + 
   theme_calc() 
 ```
-This results are consistent with our theory that said if $N$ is similar to $P$ then computation time should be efficient for the $QR$ method, but as $N >> P$, the QR algorithm needs twice as much work because it requires the factorization of $X$.
+These results are consistent with our theory that said if $N$ is similar to $P$ then computation time should be efficient for the $QR$ method, but as $N >> P$, the QR algorithm needs twice as much work because it requires the factorization of $X$.
 
 
 #### The effect of the number of variables P
@@ -558,16 +543,40 @@ resultsPvalue <- list(
   Pvalue = Pvalue,
   N = N
 )
-saveRDS(resultsNvalue, file = "myCache/benchmarkPvalue.RDS")
+saveRDS(resultsPvalue, file = "myCache/benchmarkPvalue.RDS")
 ```
 
 ```{r, include = FALSE}
-resultsNvalue <- readRDS("myCache/benchmarkNvalue.RDS")
-for (i in 1:length(resultsNvalue)) {
-  assign(names(resultsNvalue)[i], resultsNvalue[[i]])
+resultsPvalue <- readRDS("myCache/benchmarkPvalue.RDS")
+for (i in 1:length(resultsPvalue)) {
+  assign(names(resultsPvalue)[i], resultsPvalue[[i]])
 }
 ```
 
+```{r}
+data_frame(
+  P = scales::comma(Pvalue),
+  QR = paste0(qr_time, "s"),
+  `Full Inversion` = paste0(inv_time, "s")
+) %>% 
+  knitr::kable(align = "rrr") # for nice table format in rmarkdown
+```
+
+```{r}
+plot_data <- data.frame(
+  logP = log(Pvalue, 10),
+  qr_time = qr_time,
+  inv_time = inv_time
+) %>% 
+  gather(method, seconds, -logP)
+ggplot(plot_data, aes(x = logP, y = seconds, colour = method)) +
+  geom_line(size = 1) +
+  scale_colour_discrete(labels = c("Full Inverse", "QR")) + 
+  ggtitle("Effect of increasing P with N = 10,000 fixed") + 
+  theme_calc() 
+```
+
+From this last plot it seems pretty obvious that although the QR method has many benefits in numerical stability, it does not scale very well. The increase in $P$ affects the QR method even more than an increase in $N$>
 
 <!-- #### (Bonus subsection) Use metaprogramming to make it work just like the lm function of R -->
 
@@ -638,37 +647,165 @@ for (i in 1:length(resultsNvalue)) {
 <!-- lm(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris) -->
 <!-- ``` -->
 
-<!-- ### (D) The Sparse World -->
-
-<!-- A *sparse matrix* $A$ is a matrix in which most elements are zero. A consequence is that traditional algorithms waste too much energy with unnecessary loops when handling these matrices. These matrices are usually represented more efficially as lists, each entry containing a row, a column, and a value. For example: -->
-<!-- $$ -->
-<!-- \begin{bmatrix} -->
-<!-- 0 & 0 & 0 & 0 & 9 & 0 \\ -->
-<!-- 0 & 9 & 0 & 0 & 0 & 0 \\ -->
-<!-- 4 & 0 & 0 & 2 & 0 & 0 \\ -->
-<!-- 0 & 0 & 0 & 0 & 0 & 5 \\ -->
-<!-- 0 & 0 & 2 & 0 & 0 & 0  -->
-<!-- \end{bmatrix} -->
-<!-- $$ -->
-<!-- becomes -->
-
-<!-- | *nrows* | *ncolumns* | *nvalues* | -->
-<!-- | :--: |  :-----: | :-----: | -->
-<!-- |   5   |     6    |    6    | -->
+### (D) The Sparse World
 
 
-<!-- | *row* | *column* | *value* | -->
-<!-- | :---: |  :-----: | :-----: | -->
-<!-- |   1   |     5    |    9    | -->
-<!-- |   2   |     2    |    8    | -->
-<!-- |   3   |     1    |    4    | -->
-<!-- |   3   |     3    |    2    | -->
-<!-- |   4   |     6    |    5    | -->
-<!-- |   5   |     3    |    2    | -->
+***Now what happens if X is a highly sparse matrix, in the sense that most entries are zero? Ideally we’d realize some savings by not doing a whole bunch of needless multiplication by zero in our code. ***
 
-<!-- Algorithms for sparse matrices adapt to this type of internal data representation. If a sparse matrix algorithm is used with a dense matrix, then it will less efficient, but they are typically much faster for sparse matrices. -->
+#### Some background
 
-<!-- In R, the library `Matrix` handles sparse matrices, having a special S4 class. For the uninitiated is R's formal S4 classes, the thing to remember is that implication of having a class is that multiplication, summation, and many function can automatically identify if the input matrix is of this class, and then call appropriate corresponding algorithm. -->
+A *sparse matrix* $A$ is a matrix in which most elements are zero. A consequence is that traditional algorithms waste too much energy with unnecessary loops when handling these matrices. These matrices are usually represented more efficially as lists, each entry containing a row, a column, and a value. For example:
+$$
+\begin{bmatrix}
+0 & 0 & 0 & 0 & 9 & 0 \\
+0 & 9 & 0 & 0 & 0 & 0 \\
+4 & 0 & 0 & 2 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 5 \\
+0 & 0 & 2 & 0 & 0 & 0
+\end{bmatrix}
+$$
+becomes
+
+| *nrows* | *ncolumns* | *nvalues* |
+| :--: |  :-----: | :-----: |
+|   5   |     6    |    6    |
+
+
+| *row* | *column* | *value* |
+| :---: |  :-----: | :-----: |
+|   1   |     5    |    9    |
+|   2   |     2    |    8    |
+|   3   |     1    |    4    |
+|   3   |     3    |    2    |
+|   4   |     6    |    5    |
+|   5   |     3    |    2    |
+
+Algorithms for sparse matrices adapt to this type of internal data representation. If a sparse matrix algorithm is used with a dense matrix, then it will less efficient, but they are typically much faster for sparse matrices.
+
+In R, the library `Matrix` handles sparse matrices, having a special S4 class. For the uninitiated is R's formal S4 classes, the thing to remember is that implication of having a class is that multiplication, summation, and many function can automatically identify if the input matrix is of this class, and then call appropriate corresponding algorithm. La `Matrix` not only handle sparse matrices, but in general optimal algorithms for several clases such as diagonal, triangular, dense, sparse, sparse diagonal, sparse triagular, etc. The programming concept of inheritence allows one objecto to have more than one class.
+
+```{r}
+library(Matrix)
+```
+
+#### A QR algorithm for sparse data
+
+It turns out that we don't have to use any modifications to our code, this is because the way the Matrix package is designed, all the functions we used are overloaded to call specialezed routines for sparse data if the input Matrix has the class sparse. I will break this down.
+
+```{r}
+X <- matrix(c(1,0,0,0)) %>% 
+  Matrix(sparse = TRUE)
+y <- c(1,0)
+weights <- c(1,1)
+str(X)
+```
+
+We see this object has a class `dgCMatrix`, which is just a code for sparse matrix. The `dcGMatrix` class is a subclass of `Matrix`, so our first line of code reads
+
+```{r}
+inherits(X, c("matrix", "Matrix")) # X will inherit from "Matrix"
+```
+Now the next part, we shall see that even after the multiplications with the weights, `Xtilde` is sparse
+
+```{r}
+Xtilde <- X * sqrt(weights) 
+ytilde <- y * sqrt(weights)
+str(Xtilde)
+```
+
+The QR factorization routine called when the inpute is sparse is a special method for the input. The output has a tag `sparseQR`
+
+```{r}
+# 2-4. QR solver
+qr_decomp <- qr(Xtilde, LAPACK = TRUE)
+str(qr_decomp)
+```
+
+```{r}
+beta_hat <- qr.coef(qr_decomp, ytilde)
+beta_hat
+```
+
+
+#### Benchmarking with sparse data
+
+We will now use the  Matrix package and simulated large sparse data and repeat our experiments of the previous answer.
+
+
+##### The effect of sample size $N$ with different values of sparsity
+
+
+For this test we will fix $p = 9$ and compute for exponentially increasing values of $N$ the effect. 
+
+Ok, so let's simulate a moderate dense database from a theoretical model. Let's generate some random data. 
+
+*Note:* you could use the function `objetct.size` and vertify that the storage size of `X` greatly reduces once decleared as sparse
+
+```{r, eval = FALSE}
+N <- 1e6 # up to 1,000,000 observations
+P <- 9 # just 9 variables
+# large random dense design matrix ~ 762mb
+set.seed(110104) # reproducibility
+Xdense <- rnorm(N * P) %>% 
+  Matrix(ncol = P, sparse = TRUE) # We will mask Xdense later in our code with the different levels
+sparsity <- c(.05, .25, .50, .75) # used to create many zeros later in X later in the code
+# random true model
+beta <- rnorm(P) # random coefficients
+sigma <- .01 # error size
+y <- drop(X %*% beta) + rnorm(N, sd = sigma)
+weights <- rep(1, N)
+```
+
+Now we run the same simulations
+
+```{r, eval = FALSE}`
+Nvalue <- floor(10^seq(2, 6, by = 0.5)) # 100, 316, 1000, etc..
+# create a grid of combinatios of sparsity and N
+time_grid_N_sparse <- expand.grid(sparsity = sparsity, Nvalue = Nvalue)
+time_grid_N_sparse$qr_time_sparse <- 0
+time_grid_N_sparse$inv_time_sparse <- 0
+for (i in seq_along(time_grid_N_sparse)) {
+  n <- time_grid_N_sparse$Nvalue[i]
+  sparsity <- time_grid_N_sparse$sparsity[i] 
+  mask <- rbinom(n * P, 1, sparsity)
+  X <- Xdense * mask # R knows this means multiply every entery
+  t_qr <- microbenchmark(wls_qrfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 10L)
+  t_inv <- microbenchmark(wls_invfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 10L)
+  time_grid_N_sparse$qr_time_sparse[i] <- mean(t_qr$time)  / 1e9
+  time_grid_N_sparse$inv_time_sparse[i] <- mean(t_inv$time)  / 1e9
+}
+```
+
+We print the comparison of the methods
+
+```{r, eval = FALSE, include = FALSE}
+saveRDS(time_grid_N_sparse, file = "myCache/benchmarkNvalueSparse.RDS")
+```
+
+```{r, include = FALSE}
+time_grid_N_sparse <- readRDS("myCache/benchmarkNvalueSparse.RDS")
+```
+
+```{r}
+time_grid_N_sparse %>% 
+  knitr::kable(align = "rrrr") # for nice table format in rmarkdown
+```
+
+```{r}
+plot_data <- time_grid_N_sparse %>% 
+  mutate(logN = log(Nvalue, 10)) %>% 
+  select(-Nvalue) %>% 
+  gather(method, seconds, -c(logN, sparsity)) 
+ggplot(plot_data, aes(x = logN, y = seconds, colour = method)) +
+  facet_grid(sparsity ~ .) +
+  geom_line(size = 1) +
+  # scale_colour_discrete(labels = c("Full Inverse", "QR")) + 
+  ggtitle("Effect of increasing N with P = 9 fixed") + 
+  theme_calc() 
+```
+These results are consistent with our theory that said if $N$ is similar to $P$ then computation time should be efficient for the $QR$ method, but as $N >> P$, the QR algorithm needs twice as much work because it requires the factorization of $X$.
+
+
 
 <!-- Let's save our sample sparse matrix in a variable `X`: -->
 

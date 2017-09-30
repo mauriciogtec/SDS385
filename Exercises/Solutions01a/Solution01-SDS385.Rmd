@@ -3,7 +3,6 @@ title: "SDS 385 Stats Models for Big Data"
 subtitle: 'Solutions 01a: Mauricio Garcia Tec'
 output:
   html_document: default
-  html_notebook: default
 ---
 
 ```{r setup, include=FALSE}
@@ -499,6 +498,7 @@ ggplot(plot_data, aes(x = logN, y = seconds, colour = method)) +
   ggtitle("Effect of increasing N with P = 9 fixed") + 
   theme_calc() 
 ```
+
 These results are consistent with our theory that said if $N$ is similar to $P$ then computation time should be efficient for the $QR$ method, but as $N >> P$, the QR algorithm needs twice as much work because it requires the factorization of $X$.
 
 
@@ -522,52 +522,39 @@ weights <- rep(1, N)
 
 
 ```{r, eval = FALSE}
-Pvalue <- floor(10^seq(1, 4, length.out = 11)) - 1 # 9, 18, 38, 78, 157, etc..
-qr_time <- numeric(length(Pvalue))
-inv_time <- numeric(length(Pvalue))
+time_grid_P <- data.frame(
+  Pvalue = floor(10^seq(2, 4, length.out = 11)) - 1 # 100, 316, 1000, etc..
+)
+time_grid_P$qr_time <- 0
+time_grid_P$inv_time <- 0
 for (i in seq_along(Pvalue)) {
   p <- Pvalue[i]
   t_qr <- microbenchmark(wls_qrfit(X[1:N, 1:p], y[1:N], weights[1:N]), times = 3L) # takes longer...
   t_inv <- microbenchmark(wls_invfit(X[1:N, 1:p], y[1:N], weights[1:N]), times = 3L)
-  qr_time[i] <- mean(t_qr$time)  / 1e9
-  inv_time[i] <- mean(t_inv$time)  / 1e9
+  time_grid_P$qr_time[i] <- mean(t_qr$time)  / 1e9
+  time_grid_P$inv_time[i] <- mean(t_inv$time)  / 1e9
 }
 ```
 
 We print the comparison of the methods
 
 ```{r, eval = FALSE, include = FALSE}
-resultsPvalue <- list(
-  qr_time = qr_time,
-  inv_time = inv_time,
-  Pvalue = Pvalue,
-  N = N
-)
-saveRDS(resultsPvalue, file = "myCache/benchmarkPvalue.RDS")
+saveRDS(time_grid_P, file = "myCache/benchmarkPvalue.RDS")
 ```
 
 ```{r, include = FALSE}
-resultsPvalue <- readRDS("myCache/benchmarkPvalue.RDS")
-for (i in 1:length(resultsPvalue)) {
-  assign(names(resultsPvalue)[i], resultsPvalue[[i]])
-}
+time_grid_P <- readRDS("myCache/benchmarkPvalue.RDS")
 ```
 
 ```{r}
-data_frame(
-  P = scales::comma(Pvalue),
-  QR = paste0(qr_time, "s"),
-  `Full Inversion` = paste0(inv_time, "s")
-) %>% 
+time_grid_P %>% 
   knitr::kable(align = "rrr") # for nice table format in rmarkdown
 ```
 
 ```{r}
-plot_data <- data.frame(
-  logP = log(Pvalue, 10),
-  qr_time = qr_time,
-  inv_time = inv_time
-) %>% 
+plot_data <- time_grid_P %>%
+  mutate(logP = log(Pvalue, 10)) %>% 
+  select(-Pvalue) %>% 
   gather(method, seconds, -logP)
 ggplot(plot_data, aes(x = logP, y = seconds, colour = method)) +
   geom_line(size = 1) +
@@ -576,7 +563,7 @@ ggplot(plot_data, aes(x = logP, y = seconds, colour = method)) +
   theme_calc() 
 ```
 
-From this last plot it seems pretty obvious that although the QR method has many benefits in numerical stability, it does not scale very well. The increase in $P$ affects the QR method even more than an increase in $N$>
+From this last plot it seems pretty obvious that although the QR method has many benefits in numerical stability, it does not scale very well. The increase in $P$ affects the QR method even more than an increase in $N$.
 
 
 ### (D) The Sparse World

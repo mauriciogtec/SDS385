@@ -7,6 +7,8 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
 ```
 
 ## Generalized Linear Models
@@ -16,7 +18,7 @@ As an archetypal chase of a GLM, we'll consider the binomial logistic regression
 $$
 y_i \sim \mathrm{Binom}(m_i, w_i),
 $$
-where $y_i$ is an integer number of "successes", $m_i$ is the number of trials for the $i$-tj case, and the succes probability $w_i$ is a regression on a feature vector $x_i$ given by the inverse logit transform
+where $y_i$ is an integer number of "successes", $m_i$ is the number of trials for the $i$-tj case, and the succes probability $w_i$ is a regression on a feature vector $x_i$ given by the inverse logit transform 
 $$
 w_i = \frac{1}{1 + \exp\{-x_i^\top\beta\}}.
 $$
@@ -39,64 +41,68 @@ $$
 in your expression.
 </strong></em>
 
-The model is for the binary logistic regression is
+Our model is a binomial logistic regression is
 $$
-y_i \sim \mathrm{Bernoulli}\left(w_i(\beta)\right)
+y_i | x_i, \beta \sim \mathrm{Binom}\left(m_i, w_i(\beta)\right)
 $$
-Or equivalently, that
+Or equivalently, 
 $$
-\mathbb{P}(y_i = x \mid \beta) = \begin{cases} 
-  w_i(\beta) & \text{if} & x = 1 \\
-  1 - w_i(\beta) & \text{if} & x = 0 \\
-  0   & & \text{otherwise} 
-\end{cases}
-$$
-or more succintly
-$$
-p_i(y_i) = w_i(\beta)^{y_i}( 1 - w_i(\beta))^{1 - y_i} \quad \text{ for } \quad y_i\in\{0,1\}
+\mathbb{P}(y_i = y \mid \beta) = \binom{m_i}{y}w_i(\beta)^y(1 - w_i(\beta))^{m_i - y}
 $$
 The loglikelihood loss function is thus
 $$
 \begin{aligned}
 l(\beta) & = - \log \left\{ \prod_{i = 1}^n p_i(y_i \mid \beta ) \right\} \\
 & = - \sum_{i=1}^N \log \left\{ p_i(y_i \mid \beta ) \right\} \\
-& = - \sum_{i=1}^N \left\{ y_i \log(w_i(\beta)) + (1-y_i)\log(1 - w_i(\beta)) \right\} \\
-& = - \sum_{i=1}^N \left\{ \log(1 - w_i(\beta)) + y_i\log\left( \frac{w_i(\beta)}{1 - w_i(\beta)}\right) \right\}. 
+& = - \sum_{i=1}^N \left\{ y_i \log(w_i(\beta)) + (m_i-y_i)\log(1 - w_i(\beta)) \right\} \\
 \end{aligned}
 $$
-For the last expression we only used standard properties of the logarithm; the interesting part, however, is that the function $y \mapsto log(y  / (1-y))$ is actually the inverse of $u \mapsto 1/(1 + \exp(-u))$, so the loglikelihood loss function reduces to
+This expression is very comfortable because it is easily vectorized in a computer language. 
+
+Just as we did in the previous exercise with linear regression, in order to optimize this logloss function we must find $\hat{\beta}$ satisfying the first order conditions $\nabla l(\hat{\beta}) = 0$. Since the gradient depends on the derivatives of the $w_i(\beta)$, we first need to obtain their gradients.
+
+Define the sigmoid function
 $$
 \begin{aligned}
-l(\beta) & = - \sum_{i=1}^N \left\{ \log(1 - w_i(\beta)) + y_ix_i^\top \beta \right\} \\
- & = - y^\top X \beta - \overline{1}_N^\top \log(1 - w(\beta)),
+\sigma \colon & \mathbb{R} \to [0,1] \\ 
+& u \mapsto \frac{1}{1 + e^{-u}}.
 \end{aligned}
 $$
-where $\overline{1}_N$ is the vector of all ones. Computing the gradient of $l$ is now easy, we first need to differentiate $w_i(\beta)$
+It is clear that $w_i(\beta) = \sigma(x_i^\top \beta)$. This function has nice derivative properties
 $$
 \begin{aligned}
-\nabla_\beta w_i(\beta) &= \nabla_\beta \left\{ \left(1 + \exp\{-x_i^\top\beta\} \right)^{-1}  \right\} \\
-&= -\left(1 + \exp\{ - x_i^\top\beta\} \right)^{-2} \exp(-x_i^\top \beta)(-x_i) \\
-&= -w_i(\beta)^2 \left( \frac{1}{w_i(\beta)} - 1 \right)(-x_i) \\
-&=   w_i(\beta)\left(1 - w_i(\beta)\right) x_i.
+\frac{\partial}{\partial u}\sigma(u)  &= \frac{\partial}{\partial u} \left(1 + \exp(-u) \right)^{-1} \\
+&= -\left(1 + \exp(-u) \right)^{-2} \exp(-u) \\
+&= -\sigma(u)^2 \left( \frac{1}{\sigma(u)} - 1 \right) \\
+&= -\sigma(u)\left(1 - \sigma(u)\right).
 \end{aligned}
 $$
-The expression is useful to compute $\nabla_\beta l(\beta)$, but later it will be useful to rewrite the above in a convenient way. The *Jacobian* matrix $\nabla_\beta w(\beta) \in \mathbb{R}^{N \times P}$ of the map $\beta  \mapsto (w_1(\beta),...,w_N(\beta))$ is the matrix whose $i$-th row is $\nabla_iw(\beta)$. Let $W = \textrm{diag}(w(\beta))$, we see that
+From the chain rule (and using one of our matrix differentiation formulas of last exercise) it is clear that
+
+$$
+\nabla_\beta w_i(\beta) = w_i(\beta)(1 - w_i(\beta))x_i
+$$
+This again can be improved in matrix form, which we will nade for later exercises. The *Jacobian* matrix $\nabla_\beta w(\beta) \in \mathbb{R}^{N \times P}$ of the map $\beta  \mapsto (w_1(\beta),...,w_N(\beta))$ is the matrix whose $i$-th row is $\nabla_iw(\beta)$. If we write $W = \textrm{diag}(w(\beta))$, we see that
 $$
 \nabla_\beta w(\beta) = W(1-W)X.
 $$
 
-We will use this result later, for now, we return to derivate $l$ using the chain rule with matrix differentiation (see  `Solution01a` for the recap on matrix differentiation). We now compute $\nabla_\beta l$
+We will use this result later, for now, we return to computing the gradient of $l$ using the chain rule
 $$
 \begin{aligned}
-\nabla_\beta l(\beta) &= \nabla_\beta  \left\{ - y^\top X \beta - \overline{1}_N^\top \log(1 - w(\beta)) \right\} \\
-&= -X^\top y  -  \sum_{i=1}^N \nabla_\beta  \log(1 - w_i(\beta))  \\
-&= -X^\top y  +  \sum_{i=1}^N \frac{1}{1-w_i(\beta)}w_i(\beta)(1 - w_i(\beta))x_i  \\
-&= -X^\top y  +  \sum_{i=1}^N w_i(\beta)x_i  \\
-&=  -X^\top y + X^\top w(\beta)  \\
-&=  X^\top \left(w(\beta) - y\right)  \\
+\nabla_\beta l(\beta) &= \nabla_\beta  \left\{ - \sum_{i = 1}^N y_i\log(w_i(\beta)) + (m_i - y_i)\log(1 - w_i(\beta)) \right\} \\
+&= - \sum_{i = 1}^N \left\{ y_i \frac{\nabla_\beta{w_i(\beta)}}{w_i(\beta)} -  (m_i - y_i) \frac{\nabla_\beta{w_i(\beta)}}{ 1- w_i(\beta)} \right\} \\
+&= - \sum_{i = 1}^N \left\{ y_i (1 - w_i(\beta))x_i -  (m_i - y_i)w_i(\beta)x_i \right\} \\
+&= - \sum_{i = 1}^N  (y_i - m_iw_i(\beta))x_i. \\
 \end{aligned}
 $$
+The last expression is really beautiful, because if $w_i(\beta)$ represents the success probabilit, then $m_iw_i(\beta)$ is the expected number of successes, which we are directly comparing to the true number of successes $y_i$.
 
+Is not hard to verify that the expression for $\nabla_\beta l(\beta)$ above can be written in matrix form, which will result more efficient for the computers
+$$
+\nabla_\beta l(\beta) = -X^\top(y - W m) = -X^\top(y - w \otimes m),
+$$
+where $\otimes$ means entrywise multiplication.
 
 <strong><em>
 
@@ -105,11 +111,24 @@ $$
 Read up on the method of steepest descent, i.e. gradient descent, in Nocedal and Wright (see course website). Write your own function that will ﬁt a logistic regression model by gradient descent. Grab the data “wdbc.csv” from the course website, or obtain some other real data that interests you, and test it out. The WDBC ﬁle has information on 569 breast-cancer patients from a study done in Wisconsin. The ﬁrst column is a patient ID, the second column is a classiﬁcation of a breast cell (Malignant or Benign), and the next 30 columns are measurements computed from a digitized image of the cell nucleus. These are things like radius, smoothness, etc. For this problem, use the ﬁrst 10 features for X, i.e. columns 3-12 of the ﬁle. If you use all 30 features you’ll run into trouble.
 </strong></em>
 
-For this solution I will assume familiarity with the Gradient Descent Method with Backtracking search. 
+For this exercise I will assume the reader is familiar with gradient descent, which is a technique for solving unrestricted optimization problems of the form
+$$
+\min_u f(u)
+$$
+when $f$ is continously differentiable and hopefully convex. At each iteration, the steepest descent method picks a step size $\alpha_i$ (a.k.a. learning rate) and an initial guess $u_0$ and makes updates according to the rule
+$$
+u_i \mapsto u_{i -1} - \alpha_i \nabla_u f(u_{i-1}).
+$$
+At a basic level, one starts with an arbitrary fixed $\alpha$ used for all values of $\alpha_i$. Linesearch algorithms make the method much more robust by automatically selecting a good choice of $\alpha$ at every step. The rationale for linesearch is that the gradient always gives a direction where the function can be decreased with very small movements, but not necessarily for large ones; linesearch seeks a step not too small, not too large, with a minimum decrease. I will implement a basic version of backtracking linesearch which is a simple technique for sequentially reducing the step size until reasonable decrease is found.
 
 ##### The Data
 
-The varible $X$ will store 10 features and $y$ the outcome, where $y = 1$ if the cancer is Maligne and $y=0$ otherwise.
+The varible $X$ will store 10 features and $y$ the outcome, where $y = 1$ if the cancer is Maligne and $y=0$ otherwise. For computation purposes, the features will be scaled, meaning that for each column $x^j$ we will do a transformation
+$$
+x^j \leftarrow \frac{x^j - \mathrm{mean}(x^j)}{\mathrm{stdev}(x^j)},
+$$
+this will make all columns centered (zero mean) and scaled (standard deviation one). This helps a lot to improve the performance of algorithms since the resultant likelihood is better behaved. This might not be necessary for more advanced optimization methods, such as Newthon's method, but is is necessary for gradient descent.
+
 
 ```{r, warning=FALSE, message=FALSE}
 # Hint: read_csv of tidyverse's package readr is similar read.csv but "cleaner" and somewhat more efficient
@@ -118,9 +137,13 @@ wdbc <- read_csv(
   file = url("https://raw.githubusercontent.com/jgscott/SDS385/master/data/wdbc.csv"),
   col_names = FALSE
 )
-X <- cbind(1, wdbc[ ,3:10]) # 1 adds an intercept
-X <- as.matrix(X) # for numerical algorithms
-y <- as.integer(wdbc[[2]] == "M")
+X <- wdbc[ ,3:12] %>% 
+  scale() %>%
+  cbind(1, .) %>% 
+  as.matrix()
+y <-(wdbc[[2]] == "M") %>% 
+  as.integer()
+m <- 1
 ```
 
 ```{r}
@@ -132,93 +155,254 @@ print(table(y))
 print(sprintf("The prevalence of maligne cancer is %.2f%%", 100 * sum(y) / length(y)))
 ```
 
-<!-- We will now write a pair of functions that compute the loglikelihood loss function and the gradient. I will write the functions using the Rcpp framework, which gives a C++ library of R-like classes and seamless R integration to call these functions. More information about the framework [here](http://dirk.eddelbuettel.com/code/rcpp.html). The last time I checked, over 800 CRAN packages used this awesome and super fast framework. For thus uninitiated in the workd of high-performance computing, C++ is one of the fastest programming languages, in particular, it is a *compiled* language, contrary R. The compiler does a nice translation to computer language at compiling time, at does not waste time when we run a command. -->
-
-<!-- ```{r, message=FALSE, warning=FALSE} -->
-<!-- library(Rcpp) -->
-<!-- ``` -->
-
-<!-- ```{r, engine = 'Rcpp'} -->
-<!-- #include <Rcpp.h> -->
-<!-- using namespace Rcpp; -->
-
-<!-- // Step 1: Define vectorized (w_i) and Logit Functions -->
-
-<!-- NumericVector logit(NumericVector u) { -->
-<!--   int N = u.size(); -->
-<!--   NumericVector res(N); -->
-<!--   for (int i = 0; i < N; i++) { -->
-<!--     res[i] = log(u[i] / (1 - u[i])); -->
-<!--   } -->
-<!--   return res; -->
-<!-- } -->
-
-<!-- NumericVector sigmoid(NumericVector u) { -->
-<!--   int N = u.size(); -->
-<!--   NumericVector res(N); -->
-<!--   for (int i = 0; i < N; i++) { -->
-<!--     res[i] = 1 / (1 + exp(-u[i])); -->
-<!--   } -->
-<!--   return res; -->
-<!-- } -->
-
-<!-- // Step 2: Compute LogLoss and Its Gradient -->
-<!-- // The Directive [[Rcpp::export]] before the functions tells Rcpp to export the function to R's working environment -->
-
-<!-- // [[Rcpp::export]] -->
-<!-- double logloss(NumericVector beta, NumericVector y, NumericMatrix X) { -->
-<!--   int N = y.size(); -->
-<!--   int P = beta.size(); -->
-<!--   double ll = 0; -->
-<!--   for (int i = 0; i < N; i++) { -->
-<!--     res[i] = 1 / (1 + exp(-u[i])); -->
-<!--   }   -->
-<!--   return l; -->
-<!-- } -->
-<!-- ``` -->
-
 ##### The Likelihood
 
+We compute simple versions of the loglikelihood loss and related functions
 
-The versions of the loglikelihood loss and its gradient we gave are very easy to program in an efficient vectorized way
 ```{r}
-
-sigmoid <- function(u) {
-  # In:
-  #   u: vector of N x 1
-  # Out: the inverse-logit/sigmoid function of the entries of u
-  1 / (1 + exp(-u))
+#' @title Sigmoid function
+#' @description computes u -> 1 / (1 + exp(-u))
+#' @params
+#'   u: a numeric vector 
+#'   eps: a smoothing parameter to reduce perfect 0's and 1's
+#' @value a numeric vector with sigmoid(u_i) in each entry
+sigmoid <- function(u, eps = 0) {
+  # Input data type validation
+  stopifnot(is.numeric(u), is.numeric(eps))
+  # Compute sigmoid
+  s <-  1 / (1 + exp(-u))
+  # Fix perfect 0 and 1
+  if (eps > 0) {
+    s <- sapply(s, function(x) {
+      if (x < eps) x <- eps
+      if (x > 1 - eps) x <- 1 - eps
+      x
+    })
+  }
+  # Output
+  s
 }
 
-logloss <- function(beta, X, y) {
-  # In: 
-  #   beta: vector of P x 1 of generalized regression coefficients   
-  #   X: design MATRIX of N x P
-  #   y: vector of N x 1 with binary outcomes
-  # Out: the loglikelihood loss
-  reg <- X %*% beta # X is usually a dataframe
-  w <- sigmoid(as.numeric(reg))
+#' @title Binomial logloss function
+#' @description Computes the logloss of a model y | X, beta ~ Binom(m, sigmoid(Xbeta))
+#' @params
+#'   beta: a numeric vector of coefficients
+#'   X: a numeric matrix of regressors
+#'   y: an integer vector of observations
+#'   m: an integer or integer vector of the max count number for y_i,
+#'      it must have eitherlength one or the length of y.
+#' @details X can be any matrix from the Matrix package
+#' @value a real number representing the negative of the loglikelihood of the model
+logloss <- function(beta, X, y, m = 1) {
+  # Input data type validation
+  stopifnot(
+    is.numeric(beta), is.numeric(y), is.numeric(m),
+    inherits(X, c("matrix", "Matrix")),
+    length(beta) == ncol(X)
+  )
+  # regression coefficients
+  reg <- X %*% beta 
+  # predicted probabilities
+  w <- sigmoid(drop(reg), eps = 1e-5)
   # output
-  as.numeric(-sum(log(1 - w)) - crossprod(y, reg))
+  -sum(y * log(w) + (m - y) * log(1 - w))
 }
 
-logloss_grad <- function(beta, X, y) {
-  # In: 
-  #   beta: vector of P x 1 of generalized regression coefficients   
-  #   X: design MATRIX of N x P
-  #   y: vector of N x 1 with binary outcomes
-  # Out: the gradient of the logloss  
-  reg <- X %*% beta # X is usually a dataframe
-  w <- sigmoid(as.numeric(reg))
+#' @title Binomial logloss function gradient
+#' @description Computes the gradient of the logloss of a model y | X, beta ~ Binom(m, sigmoid(Xbeta))
+#' @params
+#'   beta: a numeric vector of coefficients
+#'   X: a numeric matrix of regressors
+#'   y: an integer vector of observations
+#'   m: an integer or integer vector of the max count number for y_i,
+#'      it must have eitherlength one or the length of y.
+#' @details X can be any matrix from the Matrix package
+#' @value a numeric vector with the gradient of the negative of the loglikelihood of the model
+logloss_grad <- function(beta, X, y, m = 1) {
+  # Input data type validation
+  stopifnot(
+    is.numeric(beta), is.numeric(y), is.numeric(m),
+    inherits(X, c("matrix", "Matrix")),
+    length(beta) == ncol(X)
+  )
+  # regression coefficients
+  reg <- X %*% beta 
+  w <- sigmoid(drop(reg), eps = 1e-5)
   # output
-  as.numeric(crossprod(X, w - y))
+  -drop(crossprod(X, y - m*w))
 }
 ```
 
-##### Gradient Descent
+##### Gradient Descent without linesearch
 
-Now the routines for the Gradient Descent. An important fact: it does not work at all without line search, since the function we want to optimize is very bad behaved. This in fact very well known of the likelihood function.
+We now program a first version of gradient descent without lineserach to get the idea clear:
 
+```{r}
+#' @title Gradient descent without linesearch
+#' @description Minimizes an input function f
+#' @params
+#'   x0: a numeric vector of initial guess
+#'   f: the function to mimize
+#'   grad: the gradient of f
+#'   control: a list with the parameters of the gradient descent algorithm (see details)
+#' @details The control can receive the following parameters, default values are shown
+#'   maxit: 10000, max number of iterations
+#'   tol: 1e-4, tolerance for relative convergence
+#'   history: TRUE, if TRUE saves all values of f during the iterations
+#'   step: 1 / sqrt(nrow(X)), learning rate
+#' @value a list with 
+#'   optimizer: numeric vector that is a critical point of f
+#'   value: min value reachd
+#'   converged: flag indicating convergence
+#'   iter: number of iterations
+#'   history: empty if history is FALSE, otherwise the value of f at every iteration
+gradient_descent  <- function(x0, f, grad, control=NULL) {
+  stopifnot(
+    is.numeric(x0), is.function(f), is.function(grad)
+  )
+  # Assign default control values and override for user input
+  maxit <- 1e4
+  tol <- 1e-4
+  step <- 1 / nrow(X)
+  history <-  TRUE
+  fhist <- numeric(0)
+  for (i in seq_along(names(control))) { 
+    assign(names(control)[i], control[[i]]) # overwrite default
+  }
+  # Initial values
+  x <- x0
+  fold <- f(x)
+  # Main loop
+  iter <- 1
+  converged <- FALSE
+  repeat {
+    # save values in fhist if history is asked
+    if (history) {
+      fhist <- c(fhist, fold)
+    }
+    search_direction = -grad(x)
+    # Move along the negative gradient
+    x <- x + step * search_direction
+    fnew <- f(x)
+    # Check convergence
+    converged <- abs((fnew - fold) / fold) < tol
+    # Exit if convergence
+    if (converged) {
+      break
+    }
+    # Exit if max number of iterations reached
+    if (iter >= maxit) {
+      warning("max number of iterations reached") 
+      break
+    } 
+    iter <- iter + 1
+    fold  <- fnew
+  }
+  # Output
+  list(
+    optimizer = x,
+    value = fnew,
+    converged = converged,
+    iter = iter,
+    history = fhist
+  )
+}
+```
+
+##### Fitting with gradient descent
+
+```{r}
+#' @title Binomial regression with Gradient Descent
+#' @description Fits the MLE model y | X, beta ~ Binom(m, sigmoid(Xbeta))
+#' @params
+#'   X: a numeric matrix of regressors
+#'   y: an integer vector of observations
+#'   m: an integer or integer vector of the max count number for y_i,
+#'      it must have eitherlength one or the length of y.
+#'   gd_control: a list of parameters to be passed to the gradient descent optimizer
+#' @details X can be any matrix from the Matrix package
+#' @value a list with solution of the model including:
+#'   coefficients: the regression coefficients
+#'   fitted_values: the estimated probabilities of incidence
+#'   coverged: was there convergence?
+#'   iter: iterations of the back engine
+#'   history: if history=TRUE is passed in gd_control, it return the value of logloss at each iteration
+binom_gdfit <- function(X, y, m = 1, gd_control = NULL) {
+  # Input data type validation
+  stopifnot(
+    is.numeric(y), is.numeric(m),
+    inherits(X, c("matrix", "Matrix"))
+  )
+  # Define the optimization functions and initial value
+  f <- function(beta) logloss(beta, X, y, m)
+  grad <- function(beta) logloss_grad(beta, X, y, m)
+  beta0 <- numeric(ncol(X))
+  # Call Gradient Descent
+  sol <- gradient_descent(beta0, f, grad, gd_control)
+  # Output
+  list(
+    coefficients = sol$optimizer,
+    fitted_values = sigmoid(drop(X %*% sol$optimizer)),
+    converged = sol$converged,
+    iter = sol$iter,
+    history = sol$history
+  )
+}
+```
+
+We now test our model and compare it to the `glm` function in R.
+
+
+<!-- ```{r, cache=FALSE} -->
+<!-- mod <- glm.fit(X, y, family = binomial()) -->
+<!-- print(mod$coefficients) -->
+<!-- prediction <- round(mod$fitted.values) -->
+<!-- print(table(y, prediction)) -->
+<!-- accuracy <- sum(y == prediction) / length(y) -->
+<!-- print(sprintf("The (rough) accuracy of the model is %.2f%%", 100 * accuracy)) -->
+<!-- ``` -->
+
+
+```{r}
+control <- list(
+  history = TRUE,
+  tol = 1e-4
+)
+algotime <- system.time({
+  ourmod <- binom_gdfit(X, y, gd_control = control)
+})
+print(algotime)
+print(sprintf("%d iterations with convergence=%s", ourmod$iter, ourmod$converged))
+print(ourmod$coefficients) # not too far
+prediction <- round(ourmod$fitted_values)
+print(table(y, prediction))
+accuracy <- sum(y == prediction) / length(y)
+print(sprintf("The (rough) accuracy of the model is %.2f%%", 100 * accuracy))
+# comparison <- data.frame(
+#   ourmod_logloss = logloss(ourmod$coefficients, X, y),
+#   glm_logloss = logloss(mod$coefficients, X, y)
+# )
+# print(comparison)
+```
+
+We had an awesome accuracy rate of 94.20% in very little time. Although we did have to use a low tolerance value for convergence since the problem is not very well behaved. We plot the convergence of the loglikelihood.
+
+```{r}
+plot(
+ ourmod$history, 
+ xlab = "iteration", 
+ ylab = "logloss", 
+ type = "l", 
+ col = "blue",
+ main = "Convergence of negative loglikelihood with Gradient Descent"
+)
+```
+
+
+
+#### Including linesearch
+
+The linesearch method
 ```{r}
 bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
   # Backtracking Line Search # -------------------------
@@ -226,7 +410,7 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
   # 2. Curvature Rule
   # Note: This line serach can be applied to many optimization algorithms that find decrease directions
   # Reference: (Nocedal & Wright 41)
-  # In: 
+  # In:
   #   x: current point
   #   search_direction: direction where to move
   #   f: function to evaluate
@@ -244,7 +428,7 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
   init_step_size <- 1.0
   maxit <- 1e4
   for (i in seq_along(names(control))) { # override defaults if user
-    assign(names(control)[i], control[[i]]) 
+    assign(names(control)[i], control[[i]])
   }
   # Store useful constant values
   val <- f(x)
@@ -255,7 +439,7 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
   step_size <- init_step_size
   repeat {
     newx <- x + step_size * search_direction
-    newvalue <- f(newx) 
+    newvalue <- f(newx)
     min_decrease <-  max(-min_decrease_rate * step_size * graddir_prod,0)
     if (i == maxit || newvalue < val - min_decrease) {
       break
@@ -279,7 +463,7 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
 ```
 
 ```{r}
-  
+
 gradient_descent  <- function(x0, f, grad, control=NULL, bt_control=NULL) {
   # In:
   #   x0: initial value
@@ -291,15 +475,15 @@ gradient_descent  <- function(x0, f, grad, control=NULL, bt_control=NULL) {
   #     init_step_size: initial step size for the gradient descent, defautls 0.5
   #     recycle_step_size: use lineserach output as initial step_size for next linesearch, defaults false
   #   bt_control: arguments to pass to the control argument of the bt_linesearch function
-  #   
+  #
   # Out: the a local minimizer of f found using gradient descent with backtracking linesearch
-  
+
   # Default and user control values
   maxit <- 1e4
   tol <- 1e-11
   init_step_size <- 0.5
   recycle_step_size = FALSE
-  for (i in seq_along(names(control))) { 
+  for (i in seq_along(names(control))) {
     assign(names(control)[i], control[[i]]) # overwrite default
   }
   # Algorithm
@@ -310,16 +494,16 @@ gradient_descent  <- function(x0, f, grad, control=NULL, bt_control=NULL) {
   # -- main iteration
   repeat {
     bt_output <- bt_linesearch(
-      x = x, 
-      search_direction = -grad(x), 
-      f = f, 
-      grad = grad, 
+      x = x,
+      search_direction = -grad(x),
+      f = f,
+      grad = grad,
       control = c(bt_control, list(init_step_size = step_size))
     )
     x <- bt_output$newx
     newvalue <- bt_output$newvalue
     if (recycle_step_size) {
-      step_size <- bt_output$step_size  
+      step_size <- bt_output$step_size
     }
     # print(bt_output$iter)
     # print(newvalue)
@@ -355,57 +539,6 @@ print(sprintf("The (rough) accuracy of the model is %.2f%%", 100 * accuracy))
 ```
 
 Now **our solution** with our methods. It will be very close, although the optimization problem is very complex for the gradient descent method alone.
-
-```{r}
-logit_gdfit <- function(X, y, ...) {
-  # In: 
-  #   X: design MATRIX of N x P
-  #   y: vector of N x 1 with binary outcomes
-  #   ...: control and bt_control arguments to pass to the gradient_descent engine.
-  # Output:
-  #   coefficients: the regression coefficients
-  #   fitted_values: the estimated probabilities of incidence
-  #   covergence: was there convergence?
-  #   iter: iterations of the back engine
-  mod <- gradient_descent(
-    x0 = numeric(ncol(X)), # vector of zeros
-    f = function(beta) logloss(beta, X, y), 
-    grad = function(beta) logloss_grad(beta, X, y),
-    ...
-  )
-  # Output
-  list(
-    coefficients = mod$x,
-    fitted_values = as.numeric(sigmoid(X %*% mod$x)),
-    convergence = mod$convergence,
-    iter = mod$iter
-  )
-}
-```
-
-```{r, cache=TRUE}
-control <- list(
-  maxit = 1e6,
-  tol = 1e-5,
-  init_step_size = 1e-4 # I just know, but there's no good reason...
-) 
-algotime <- system.time({
-  ourmod <- logit_gdfit(X, y, control = control)
-})
-print(algotime)
-print(sprintf("%d iterations with convergence=%s", ourmod$iter, ourmod$convergence))
-print(ourmod$coefficients) # not too far
-prediction <- round(ourmod$fitted_values) 
-print(table(y, prediction))
-accuracy <- sum(y == prediction) / length(y)
-print(sprintf("The (rough) accuracy of the model is %.2f%%", 100 * accuracy))
-comparison <- data.frame(
-  ourmod_logloss = logloss(ourmod$coefficients, X, y),
-  glm_logloss = logloss(mod$coefficients, X, y)
-)
-print(comparison)
-```
-With 89.98% we weren't too far from the 93.15% accuracy; we can actually decrease our `tol` and achieve that, but it already took 21 minutes in my fast i7 processor machine already, so we better propose something smarter (even if we had programmed it using C, we will priviledge intelligence over power, for this time). Here's how our achieve logloss compares to the glmfit solution.
 
 
 #### (B) Newthon's Method
@@ -473,131 +606,131 @@ would be harder, and just like
 
 ##### Implementation of Newthon's method in R
 
-```{r}
-logit_newton_direction <- function(X, y, beta0) {
-  # Input type validation
-  stopifnot(
-    inherits(X, c("Matrix", "matrix")), 
-    inherits(y, c("numeric", "integer", "boolean"))
-  )
-  # Computations to obtain the working weights and responses for intermediate WLS
-  reg <- as.numeric(X %*% beta0) # Regression at beta0
-  w <- sigmoid(reg) # Vector of current predictions
-  error <- y - w  # prediction error
-  wlm_weights <- w * (1 - w)
-  wlm_responses <- reg + error / wlm_weights # working responses
-  # Perform weighted least squares to obtain new point
-  betanew <- lm.wfit(X, wlm_responses, wlm_weights)$coefficients 
-  # New direction is the vector difference
-  newton_direction <- betanew - beta0
-  # Output
-  newton_direction
-}
-```
+<!-- ```{r} -->
+<!-- logit_newton_direction <- function(X, y, beta0) { -->
+<!--   # Input type validation -->
+<!--   stopifnot( -->
+<!--     inherits(X, c("Matrix", "matrix")),  -->
+<!--     inherits(y, c("numeric", "integer", "boolean")) -->
+<!--   ) -->
+<!--   # Computations to obtain the working weights and responses for intermediate WLS -->
+<!--   reg <- as.numeric(X %*% beta0) # Regression at beta0 -->
+<!--   w <- sigmoid(reg) # Vector of current predictions -->
+<!--   error <- y - w  # prediction error -->
+<!--   wlm_weights <- w * (1 - w) -->
+<!--   wlm_responses <- reg + error / wlm_weights # working responses -->
+<!--   # Perform weighted least squares to obtain new point -->
+<!--   betanew <- lm.wfit(X, wlm_responses, wlm_weights)$coefficients  -->
+<!--   # New direction is the vector difference -->
+<!--   newton_direction <- betanew - beta0 -->
+<!--   # Output -->
+<!--   newton_direction -->
+<!-- } -->
+<!-- ``` -->
 
-```{r}
-logit_newton_fit <- function(X, y, beta0, 
-                              history = FALSE, 
-                              linesearch = TRUE, 
-                              control = NULL, 
-                              ls_control = NULL) {
-  # Input type validation
-  stopifnot(
-    inherits(X, c("Matrix", "matrix")), 
-    inherits(y, c("numeric", "integer", "boolean"))
-  )
-  # Default controls and user values
-  maxit <- 1e3
-  tol <- 1e-6 # currently, only relative value convergence implemented |(fnew - fold) / fold| < rtol
-  for (i in seq_along(names(control))) { 
-    assign(names(control)[i], control[[i]]) # overwrite default
-  }
-  # Define function to be optimized
-  f <- function(beta) logloss(beta, X, y)
-  grad <-  function(beta) logloss_grad(beta, X, y) # necessary for linesearch only
-  # Newton descent
-  beta <- beta0
-  fold <- f(beta0)
-  iter <- 1
-  # -- main iteration
-  if (history) {
-    logloss_history <- fold
-    step_size_history <- 1
-    accuracy_history <- .5 # random guess
-  }
-  
-  repeat {
-    newton_direction <- logit_newton_direction(X, y, beta)
-    # Do linesearch if necessary
-    if (linesearch) {
-      btls <- bt_linesearch(
-        x = beta,
-        search_direction = newton_direction,
-        f = f,
-        grad = grad,
-        control = ls_control
-      )
-      step_size <- btls$step_size
-    } else {
-      step_size <- 1
-    }
-    beta <- beta + step_size*newton_direction
-    fnew <- f(beta)
-    # Benchmarks
-    fitted_values <-  sigmoid(as.numeric(X %*% beta))
-    accuracy <- sum(round(fitted_values) == y) / length(y)
-    # Record values
-    if (history) {
-      logloss_history <- c(logloss_history, fnew)
-      step_size_history <- c(step_size_history, step_size)
-      accuracy_history <- c(accuracy_history, accuracy)
-    }
+<!-- ```{r} -->
+<!-- logit_newton_fit <- function(X, y, beta0,  -->
+<!--                               history = FALSE,  -->
+<!--                               linesearch = TRUE,  -->
+<!--                               control = NULL,  -->
+<!--                               ls_control = NULL) { -->
+<!--   # Input type validation -->
+<!--   stopifnot( -->
+<!--     inherits(X, c("Matrix", "matrix")),  -->
+<!--     inherits(y, c("numeric", "integer", "boolean")) -->
+<!--   ) -->
+<!--   # Default controls and user values -->
+<!--   maxit <- 1e3 -->
+<!--   tol <- 1e-6 # currently, only relative value convergence implemented |(fnew - fold) / fold| < rtol -->
+<!--   for (i in seq_along(names(control))) {  -->
+<!--     assign(names(control)[i], control[[i]]) # overwrite default -->
+<!--   } -->
+<!--   # Define function to be optimized -->
+<!--   f <- function(beta) logloss(beta, X, y) -->
+<!--   grad <-  function(beta) logloss_grad(beta, X, y) # necessary for linesearch only -->
+<!--   # Newton descent -->
+<!--   beta <- beta0 -->
+<!--   fold <- f(beta0) -->
+<!--   iter <- 1 -->
+<!--   # -- main iteration -->
+<!--   if (history) { -->
+<!--     logloss_history <- fold -->
+<!--     step_size_history <- 1 -->
+<!--     accuracy_history <- .5 # random guess -->
+<!--   } -->
 
-    # Check convergence
-    if (iter == maxit || fnew < Inf && abs((fnew - fold) / fold) < tol) {
-      break
-    } else {
-      fold <- fnew
-      iter <- iter + 1
-    }
-  }
-  # output list
-  output <- list(
-    coefficients = beta,
-    fitted_values = fitted_values,
-    accuracy = accuracy,
-    loglikelihood = -fnew,
-    iter = iter,
-    convergence = !(iter == maxit)
-  )  
-  if (history) {
-    output <- c(output, list(
-      logloss_history = logloss_history,
-      step_size_history = step_size_history,
-      accuracy_history = accuracy_history
-    ))
-  }
-  output
-}
-```
+<!--   repeat { -->
+<!--     newton_direction <- logit_newton_direction(X, y, beta) -->
+<!--     # Do linesearch if necessary -->
+<!--     if (linesearch) { -->
+<!--       btls <- bt_linesearch( -->
+<!--         x = beta, -->
+<!--         search_direction = newton_direction, -->
+<!--         f = f, -->
+<!--         grad = grad, -->
+<!--         control = ls_control -->
+<!--       ) -->
+<!--       step_size <- btls$step_size -->
+<!--     } else { -->
+<!--       step_size <- 1 -->
+<!--     } -->
+<!--     beta <- beta + step_size*newton_direction -->
+<!--     fnew <- f(beta) -->
+<!--     # Benchmarks -->
+<!--     fitted_values <-  sigmoid(as.numeric(X %*% beta)) -->
+<!--     accuracy <- sum(round(fitted_values) == y) / length(y) -->
+<!--     # Record values -->
+<!--     if (history) { -->
+<!--       logloss_history <- c(logloss_history, fnew) -->
+<!--       step_size_history <- c(step_size_history, step_size) -->
+<!--       accuracy_history <- c(accuracy_history, accuracy) -->
+<!--     } -->
 
-```{r}
-system.time({
-  mod <- logit_newton_fit(X, y, numeric(ncol(X)), history = TRUE)
-})
-```
+<!--     # Check convergence -->
+<!--     if (iter == maxit || fnew < Inf && abs((fnew - fold) / fold) < tol) { -->
+<!--       break -->
+<!--     } else { -->
+<!--       fold <- fnew -->
+<!--       iter <- iter + 1 -->
+<!--     } -->
+<!--   } -->
+<!--   # output list -->
+<!--   output <- list( -->
+<!--     coefficients = beta, -->
+<!--     fitted_values = fitted_values, -->
+<!--     accuracy = accuracy, -->
+<!--     loglikelihood = -fnew, -->
+<!--     iter = iter, -->
+<!--     convergence = !(iter == maxit) -->
+<!--   )   -->
+<!--   if (history) { -->
+<!--     output <- c(output, list( -->
+<!--       logloss_history = logloss_history, -->
+<!--       step_size_history = step_size_history, -->
+<!--       accuracy_history = accuracy_history -->
+<!--     )) -->
+<!--   } -->
+<!--   output -->
+<!-- } -->
+<!-- ``` -->
 
-```{r, fig.width=12}
-# Test
-print(mod$coefficients)
-print(mod$loglikelihood)
-print(mod$accuracy)
-par(mfrow = c(2,3))
-plot(mod$fitted_values, y, xlab = "fitted", ylab = "y", main = "fitted vs predicted", pch = 21, cex = 2, bg = scales::alpha("blue", 0.15))
-hist(y - mod$fitted_values, xlab = "residuals", main = "residuals", col = scales::alpha("green", 0.2))
-plot(mod$fitted_values, y - mod$fitted_values, xlab = "fitted", ylab = "residuals", main = "residuals vs fited", cex = 2, pch = 21, bg = scales::alpha("red", 0.15))
-plot(mod$logloss_history, type = "l", col = "blue", xlab = "iter", main = "logloss value")
-plot(mod$step_size_history, type = "l", col = "red",  xlab = "iter", main = "step size")
-plot(mod$accuracy_history, type = "l", col = "green",  xlab = "iter", main = "accuracy per iteration")
-```
+<!-- ```{r} -->
+<!-- system.time({ -->
+<!--   mod <- logit_newton_fit(X, y, numeric(ncol(X)), history = TRUE) -->
+<!-- }) -->
+<!-- ``` -->
+
+<!-- ```{r, fig.width=12} -->
+<!-- # Test -->
+<!-- print(mod$coefficients) -->
+<!-- print(mod$loglikelihood) -->
+<!-- print(mod$accuracy) -->
+<!-- par(mfrow = c(2,3)) -->
+<!-- plot(mod$fitted_values, y, xlab = "fitted", ylab = "y", main = "fitted vs predicted", pch = 21, cex = 2, bg = scales::alpha("blue", 0.15)) -->
+<!-- hist(y - mod$fitted_values, xlab = "residuals", main = "residuals", col = scales::alpha("green", 0.2)) -->
+<!-- plot(mod$fitted_values, y - mod$fitted_values, xlab = "fitted", ylab = "residuals", main = "residuals vs fited", cex = 2, pch = 21, bg = scales::alpha("red", 0.15)) -->
+<!-- plot(mod$logloss_history, type = "l", col = "blue", xlab = "iter", main = "logloss value") -->
+<!-- plot(mod$step_size_history, type = "l", col = "red",  xlab = "iter", main = "step size") -->
+<!-- plot(mod$accuracy_history, type = "l", col = "green",  xlab = "iter", main = "accuracy per iteration") -->
+<!-- ``` -->
 

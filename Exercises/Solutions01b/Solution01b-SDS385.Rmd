@@ -138,10 +138,10 @@ wdbc <- read_csv(
   col_names = FALSE
 )
 X <- wdbc[ ,3:12] %>% 
-  scale() %>%
-  cbind(1, .) %>% 
-  as.matrix()
-y <-(wdbc[[2]] == "M") %>% 
+  scale() %>% # subtracting mean and dividing by st.dev.
+  cbind(1, .) %>% # add columns of ones for an intercept
+  as.matrix() 
+y <-(wdbc[[2]] == "M") %>% # indicator vector of maligne "M" cancer
   as.integer()
 m <- 1
 ```
@@ -165,7 +165,7 @@ We compute simple versions of the loglikelihood loss and related functions
 #' @params
 #'   u: a numeric vector 
 #'   eps: a smoothing parameter to reduce perfect 0's and 1's
-#' @value a numeric vector with sigmoid(u_i) in each entry
+#' @value a numeric vector with sigmoid(u_i) in each entry, regularized to avoid {0,1} if eps > 0
 sigmoid <- function(u, eps = 0) {
   # Input data type validation
   stopifnot(is.numeric(u), is.numeric(eps))
@@ -232,7 +232,7 @@ logloss_grad <- function(beta, X, y, m = 1) {
 
 ##### (B) Gradient Descent (without linesearch)
 
-We now program a first version of gradient descent without lineserach to get the idea clear:
+We now program a first version of gradient descent without linesearch to get the idea clear. Since there is no linesearch, we take an adimensional conservative step size of `1 / N`. We will be able to take larger step sizes with linesearch.
 
 ```{r}
 #' @title Gradient descent without linesearch
@@ -262,21 +262,18 @@ gradient_descent  <- function(x0, f, grad, control=NULL) {
   tol <- 1e-4
   step <- 1 / nrow(X)
   history <-  TRUE
-  fhist <- numeric(0)
   for (i in seq_along(names(control))) { 
     assign(names(control)[i], control[[i]]) # overwrite default
   }
   # Initial values
   x <- x0
   fold <- f(x)
+  # History
+  f_hist <- ifelse(history, fold, numeric())
   # Main loop
   iter <- 1
   converged <- FALSE
   repeat {
-    # save values in fhist if history is asked
-    if (history) {
-      fhist <- c(fhist, fold)
-    }
     search_direction = -grad(x)
     # Move along the negative gradient
     x <- x + step * search_direction
@@ -294,6 +291,10 @@ gradient_descent  <- function(x0, f, grad, control=NULL) {
     } 
     iter <- iter + 1
     fold  <- fnew
+    # save values in fhist if history is asked
+    if (history) {
+      f_hist <- c(f_hist, fold)
+    }
   }
   # Output
   list(
@@ -301,7 +302,7 @@ gradient_descent  <- function(x0, f, grad, control=NULL) {
     value = fnew,
     converged = converged,
     iter = iter,
-    history = fhist
+    history = f_hist
   )
 }
 ```
@@ -365,7 +366,7 @@ accuracy <- sum(y == prediction) / length(y)
 print(sprintf("The  accuracy of the model is %.2f%%", 100 * accuracy))
 ```
 
-We had an awesome accuracy rate of 94.20% in very little time. Although we did have to use a low tolerance value for convergence since the problem is not very well behaved. We plot the convergence of the loglikelihood.
+We had an awesome accuracy rate in very little time. Although we did have to use a low tolerance value for convergence since the problem is not very well behaved. We plot the value of the negative loglikelihood at every iteration and see its convergence.
 
 ```{r}
 plot(
@@ -378,7 +379,7 @@ plot(
 )
 ```
 
-We now test our model and compare it to the `glm` function in R.
+We now compare our the wit the `glm` function in R for sanity check.
 
 
 ```{r}
@@ -387,7 +388,7 @@ print(mod$coefficients)
 prediction <- round(mod$fitted.values)
 print(table(y, prediction))
 accuracy <- sum(y == prediction) / length(y)
-print(sprintf("The  accuracy of the model is %.2f%%", 100 * accuracy))
+print(sprintf("The accuracy of the model is %.2f%%", 100 * accuracy))
 ```
 
 Doing a comparison, we see that our optimization result was fairly good.
@@ -400,7 +401,7 @@ comparison <- data.frame(
 print(comparison)
 ```
 
-#### (Bonus section) Including linesearch
+### (Bonus section) Including linesearch in Gradient Descent
 
 The cool thing about backtracking linesearch is that it is super easy to implement, it works not only for gradient descent, but any search direction method, and it will require a very small change to are gradient descent to incorporate. Let's find the good step.
 
@@ -412,7 +413,7 @@ The cool thing about backtracking linesearch is that it is super easy to impleme
 #'   f: a function to mimize
 #'   grad: gradient of the function f
 #'   search_direction: a numeric vector representing a search direction
-#'   control: a list with the parameters for lineserach, defaults are
+#'   control: a list with the parameters for linesearch, defaults are
 #'     bt_rate: 0.9 speed at which to decrease step size in search
 #'     min_decrease_rate: 0.1 see Nocedal & Wright for details
 #'     init_step: 1 first step size to try
@@ -472,7 +473,180 @@ bt_linesearch <- function(x, search_direction, f, grad, control = NULL) {
 }
 ```
 
-Now let's do the very small modification to our previous gradient descent function. The bonimial fitting function will only change in that it will include an arguments for lineserach controls.
+Now let's do the very small modification to our previous gradient descent function. The binomial fitting function will only change in that it will include an arguments for linesearch controls.
+
+
+```{r}
+#' @title Gradient descent 
+#' @description Minimizes an input function f
+#' @params
+#'   x0: a numeric vector of initial guess
+#'   f: the function to mimize
+#'   grad: the gradient of f
+#'   control: a list with the parameters of the gradient descent algorithm 
+#' @details The control can receive the following parameters, default values are shown
+#'   maxit: 10000, max number of iterations
+#'   tol: 1e-4, tolerance for relative convergence
+#'   history: TRUE, if TRUE saves all values of f during the iterations
+#'   linesearch: TRUE, indicates if backtracking linesearch should be used
+#'   step: 1 / nrow(X), learning rate, dividing by nrow(X) helps with dimensionality issues, only used if linesearch is set as FALSE.
+#'   init_step: 1/ sqrt(nrow(X)), default initial step is linesearch is TRUE
+#'   ls_control: NULL, a list with parameters to pass to the linesearch function
+#' @value a list with 
+#'   optimizer: numeric vector that is a critical point of f
+#'   value: min value reachd
+#'   converged: flag indicating convergence
+#'   iter: number of iterations
+#'   history: empty if history is FALSE, otherwise the value of f at every iteration
+gradient_descent  <- function(x0, f, grad, control=NULL) {
+  stopifnot(
+    is.numeric(x0), is.function(f), is.function(grad)
+  )
+  # Assign default control values and override for user input
+  maxit <- 1e4
+  tol <- 1e-4
+  step <- 1 / nrow(X)
+  init_step <- 1 / sqrt(nrow(X))
+  history <-  TRUE
+  ls_control <- NULL
+  linesearch = TRUE
+  for (i in seq_along(names(control))) { 
+    assign(names(control)[i], control[[i]]) # overwrite default
+  }
+  if (! init_step %in% names(ls_control)) {
+    ls_control$init_step <- init_step
+  }
+  # Initial values
+  x <- x0
+  fold <- f(x)
+  # History
+  f_hist <- ifelse(history, fold, numeric())
+  step_hist <- numeric()
+  # Main loop
+  iter <- 1
+  converged <- FALSE
+  repeat {
+    # Search direction and step size with linesearch
+    search_direction = -grad(x)
+    if (linesearch) {
+      step <- bt_linesearch(x, search_direction, f, grad, ls_control)$step
+    }
+    # Move along the negative gradient
+    x <- x + step * search_direction
+    fnew <- f(x)
+    # Check convergence
+    converged <- abs((fnew - fold) / fold) < tol
+    # save values in fhist if history is asked
+    if (history) {
+      f_hist <- c(f_hist, fold)
+      step_hist <- c(step_hist, step)
+    }
+    # Exit if convergence
+    if (converged) {
+      break
+    }
+    # Exit if max number of iterations reached
+    if (iter >= maxit) {
+      warning("max number of iterations reached") 
+      break
+    } 
+    iter <- iter + 1
+    fold  <- fnew
+  }
+  # Output
+  list(
+    optimizer = x,
+    value = fnew,
+    converged = converged,
+    iter = iter,
+    history = f_hist,
+    step_history = step_hist
+  )
+}
+```
+
+And now a mild adaptation to the fitting function to keep record of all step sizes (not necessary for an actual implementation).
+
+```{r}
+#' @title Binomial regression with Gradient Descent
+#' @description Fits the MLE model y | X, beta ~ Binom(m, sigmoid(Xbeta)). 
+#' @details This version uses Gradient Descent with linesearch
+#' @params
+#'   X: a numeric matrix of regressors
+#'   y: an integer vector of observations
+#'   m: an integer or integer vector of the max count number for y_i,
+#'      it must have eitherlength one or the length of y.
+#'   gd_control: a list of parameters to be passed to the gradient descent optimizer
+#' @details X can be any matrix from the Matrix package
+#' @value a list with solution of the model including:
+#'   coefficients: the regression coefficients
+#'   fitted_values: the estimated probabilities of incidence
+#'   coverged: was there convergence?
+#'   iter: iterations of the back engine
+#'   history: if history=TRUE is passed in gd_control, it return the value of logloss at each iteration
+binom_gdfit <- function(X, y, m = 1, gd_control = NULL) {
+  # Input data type validation
+  stopifnot(
+    is.numeric(y), is.numeric(m),
+    inherits(X, c("matrix", "Matrix"))
+  )
+  # Define the optimization functions and initial value
+  f <- function(beta) logloss(beta, X, y, m)
+  grad <- function(beta) logloss_grad(beta, X, y, m)
+  beta0 <- numeric(ncol(X))
+  # Call Gradient Descent
+  sol <- gradient_descent(beta0, f, grad, gd_control)
+  # Output
+  list(
+    coefficients = sol$optimizer,
+    fitted_values = sigmoid(drop(X %*% sol$optimizer)),
+    converged = sol$converged,
+    iter = sol$iter,
+    history = sol$history,
+    step_history = sol$step_history
+  )
+}
+```
+
+
+```{r}
+control <- list(
+  history = TRUE,
+  tol = 1e-4
+)
+algotime <- system.time({
+  ourmod <- binom_gdfit(X, y, gd_control = control)
+})
+print(algotime)
+print(sprintf("%d iterations with convergence=%s", ourmod$iter, ourmod$converged))
+print(ourmod$coefficients) # not too far
+prediction <- round(ourmod$fitted_values)
+print(table(y, prediction))
+accuracy <- sum(y == prediction) / length(y)
+print(sprintf("The  accuracy of the model is %.2f%%", 100 * accuracy))
+```
+We see that with the linesearch our method is much faster than before.
+
+```{r}
+par(mfrow = c(1,2))
+plot(
+ ourmod$history, 
+ xlab = "iteration", 
+ ylab = "logloss", 
+ type = "l", 
+ col = "blue",
+ main = "Convergence of negative loglikelihood"
+)
+plot(
+ ourmod$step_history, 
+ xlab = "iteration", 
+ ylab = "step size", 
+ type = "l", 
+ col = "red",
+ main = "Step size with linesearch"
+)
+```
+
 
 #### (C) Quadratic Approximation
 
@@ -546,6 +720,16 @@ where $\tilde{W}_i$ and $z$ depend on $\hat{\beta}_i$.
 We could implement Newton's method in one simple function, but to be better protected to errors, we use linesearch too, so we first estimate the Newton direction and then mode in that direction with linesearch.
 
 ```{r}
+#' @title Search direction of Newton's method
+#' @description Fits a weighted least squares problem to obtain a search direction 
+#' @details While the funciton actually computes the new point, the search direction is returned
+#' to make it more aligned to general decrease direction methods and global convergence techniques
+#' @params
+#'   beta0: numeric vector of current estimate of beta
+#'   X: a numeric matrix of regressors
+#'   y: an integer vector of observations
+#' @details X can be any matrix from the Matrix package
+#' @value the Newton decrease direction
 logit_newton_direction <- function(beta0, X, y) {
   # Input type validation
   stopifnot(
@@ -569,20 +753,34 @@ logit_newton_direction <- function(beta0, X, y) {
 
 
 ```{r}
+#' @title Logit regression Newton's method
+#' @description Fits a logit model using Newton's method with partial weighted least squares problems
+#' @params
+#'   X: a numeric matrix of regressors
+#'   y: an integer vector of observations
+#'   control: a list of algorithm controls, see details
+#' @details controls may receive the following, default values are shown
+#'    maxit: 1e3, max number of newton iterations
+#'    tol: 1e-8 tolerance for relative convergence
+#'    history: should historic loglosses and step sizes be saved
+#'    linesearch: FALSE, defaults to FALSE a Newton's has a natural step size of 1
+#'    ls_control: parameters to be passed to the linesearch function. Not really necessary for Newton's method as the step size is usually one.
+#' @value the Newton decrease direction
 logit_newton_fit <- function(X, y,
                              history = TRUE,
-                             control = NULL,
-                             linesearch = TRUE,
-                             ls_control = NULL) {
+                             control = NULL
+                             ) {
   # Input type validation
   stopifnot(
     inherits(X, c("Matrix", "matrix")),
     is.numeric(y)
   )
   # Default controls and user values
-  maxit <- 1e4
-  tol <- 1e-4
+  maxit <- 1e3
+  tol <- 1e-8
   history <-  TRUE
+  linesearch <- FALSE
+  ls_control <-  NULL
   for (i in seq_along(names(control))) { 
     assign(names(control)[i], control[[i]]) # overwrite default
   }
@@ -601,7 +799,7 @@ logit_newton_fit <- function(X, y,
   iter <- 1
   converged <- FALSE
   repeat {
-    # Search direction and lineserach
+    # Search direction and linesearch
     newton_direction = logit_newton_direction(beta, X, y)
     if (linesearch) {
       step <- bt_linesearch(beta, newton_direction, f, grad, ls_control)$step
@@ -649,7 +847,8 @@ logit_newton_fit <- function(X, y,
 
 ```{r}
 control <- list(
-  tol = 1e-11
+  tol = 1e-11,
+  linesearch = TRUE # just to prove step size is naturally one
 )
 algotime <- system.time({
   mod <- logit_newton_fit(X, y, control = control, history = TRUE)

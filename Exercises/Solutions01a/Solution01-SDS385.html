@@ -127,7 +127,7 @@ $(document).ready(function () {
 y = X\beta + \epsilon
 \]</span> where <span class="math inline">\(y \in \mathbb{R}^N\)</span> is th vector of responses, and <span class="math inline">\(X\in \mathbb{R}^{N\times P}\)</span> a matrix of features whose <span class="math inline">\(i\)</span>-th row is <span class="math inline">\(x_i\)</span>, and <span class="math inline">\(\epsilon \in \mathbb{R}^N\)</span> is a vector of model residuals. The goal is to estimate the unknown parameter <span class="math inline">\(\beta\in\mathbb{R}^P\)</span>.</p>
 <p>Let’s say you trust the precision of some observations more than others, and therefore decide to estimate <span class="math inline">\(\beta\)</span> by the principle of weighted least squares (WLS): <span class="math display">\[
-\beta = \arg\min_{\beta\in\mathbb{R}^N} \sum_{i=1}^N (y_i - x_i^\top\beta)^2,
+\beta = \arg\min_{\beta\in\mathbb{R}^N} \sum_{i=1}^N w_i(y_i - x_i^\top\beta)^2,
 \]</span> where <span class="math inline">\(w_i\)</span> is the weight for observation <span class="math inline">\(i\)</span>. </strong></em></p>
 <div id="a-analytic-solution" class="section level3">
 <h3>(A) Analytic Solution</h3>

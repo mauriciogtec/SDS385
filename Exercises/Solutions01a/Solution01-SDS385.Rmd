@@ -460,14 +460,14 @@ weights <- rep(1, N)
 
 ```{r, eval = FALSE}
 time_grid_N <- data.frame(
-  Nvalue = floor(10^seq(2, 6, by = 0.5)) # 10, 31, 100, 316, etc..
+  Nvalue = floor(10^seq(4, 6, by = 0.5)) # 10, 31, 100, 316, etc..
 )
 time_grid_N$qr_time <- 0
 time_grid_N$inv_time <- 0
 for (i in 1:nrow(time_grid_N)) {
   n <- Nvalue[i]
-  t_qr <- microbenchmark(wls_qrfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 10L)
-  t_inv <- microbenchmark(wls_invfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 10L)
+  t_qr <- microbenchmark(wls_qrfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 5L)
+  t_inv <- microbenchmark(wls_invfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 5L)
   time_grid_N$qr_time[i] <- mean(t_qr$time)  / 1e9
   time_grid_N$inv_time[i] <- mean(t_inv$time)  / 1e9
 }
@@ -489,7 +489,7 @@ time_grid_N %>%
 ```
 
 ```{r}
-plot_data <- time_grid_N_sparse %>% 
+plot_data <- time_grid_N %>% 
   mutate(logN = log(Nvalue, 10)) %>% 
   select(-Nvalue) %>% 
   gather(method, seconds, -logN)
@@ -578,74 +578,6 @@ ggplot(plot_data, aes(x = logP, y = seconds, colour = method)) +
 
 From this last plot it seems pretty obvious that although the QR method has many benefits in numerical stability, it does not scale very well. The increase in $P$ affects the QR method even more than an increase in $N$>
 
-<!-- #### (Bonus subsection) Use metaprogramming to make it work just like the lm function of R -->
-
-<!-- This is an example of **metaprogramming** and will allow us to mimic the behaviour of `lm`. We will also add a default intercept to the model which can be removed writing `-1` just like in `lm`. -->
-
-<!-- ```{r, warning=FALSE} -->
-<!-- wls <- function(model, data, weights = rep(1, nrow(data)), method = c("qr", "inverse")) { -->
-<!--   # some input validation -->
-<!--   stopifnot(is.numeric(weights), length(weights) == nrow(data)) -->
-<!--   # make model a formula -->
-<!--   model <- as.formula(model) -->
-<!--   lhs <-  as.character(model)[[2]] # left side of formula -->
-<!--   rhs <-  as.character(model)[[3]] # right side of formula -->
-<!--   # response variable y -->
-<!--   y <- data[ ,lhs] -->
-<!--   # create design matrix X -->
-<!--   if (rhs == ".") { # case 1: all formulas -->
-<!--     X <- data[ ,-match(lhs, names(data))] # just remove y -->
-<!--   } else { -->
-<!--     remove_intercept <- grepl("-(.*?)1", rhs) # do we need intercept? -->
-<!--     if (remove_intercept) { -->
-<!--       rhs <- gsub("[ ]+(.*?)1", "", rhs) # get rid of intercept indication -->
-<!--       var_names <- strsplit(rhs, "[ ]+[\\+][ ]+")[[1]] # regexps are awesome! -->
-<!--       print(var_names) -->
-<!--       X <- data[ ,names(data) %in% var_names, drop = FALSE]  -->
-<!--     } else { -->
-<!--       var_names <- strsplit(rhs, "[ ]+[\\+][ ]+")[[1]] # regexps are awesome! -->
-<!--       X <- data.frame( -->
-<!--         `(Intercept)` = 1, -->
-<!--         data[ ,names(data) %in% var_names, drop = FALSE], -->
-<!--         check.names = FALSE -->
-<!--       ) -->
-<!--     } -->
-<!--   } -->
-<!--   # run the model  -->
-<!--   beta <- switch( -->
-<!--     method, -->
-<!--     "qr" = wls_qrfit(X, y, weights), -->
-<!--     "inverse" =  wls_invfit(X, y, weights) -->
-<!--   ) -->
-<!--   names(beta) <- names(X) -->
-<!--   # output -->
-<!--   out <- list( -->
-<!--     model = model, -->
-<!--     coefficients = beta -->
-<!--   ) -->
-<!--   out -->
-<!-- } -->
-<!-- ``` -->
-
-<!-- With intercept: -->
-
-<!-- ```{r} -->
-<!-- wls(Sepal.Width ~ Petal.Length + Petal.Width, weights = rep(1/nrow(iris), nrow(iris)), data = iris) -->
-<!-- ``` -->
-
-<!-- ```{r} -->
-<!-- lm(Sepal.Width ~ Petal.Length + Petal.Width, weights = rep(1/nrow(iris), nrow(iris)), data = iris) -->
-<!-- ``` -->
-
-<!-- No intercept: -->
-
-<!-- ```{r} -->
-<!-- wls(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris) -->
-<!-- ``` -->
-
-<!-- ```{r} -->
-<!-- lm(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris) -->
-<!-- ``` -->
 
 ### (D) The Sparse World
 
@@ -739,7 +671,7 @@ For this test we will fix $p = 9$ and compute for exponentially increasing value
 
 Ok, so let's simulate a moderate dense database from a theoretical model. Let's generate some random data. 
 
-*Note:* you could use the function `objetct.size` and vertify that the storage size of `X` greatly reduces once decleared as sparse
+*Note:* you could use the function `objetct.size` and vertify that the storage size of `X` greatly reduces once declared as sparse
 
 ```{r, eval = FALSE}
 N <- 1e6 # up to 1,000,000 observations
@@ -747,8 +679,7 @@ P <- 9 # just 9 variables
 # large random dense design matrix ~ 762mb
 set.seed(110104) # reproducibility
 Xdense <- rnorm(N * P) %>% 
-  Matrix(ncol = P, sparse = TRUE) # We will mask Xdense later in our code with the different levels
-sparsity <- c(.05, .25, .50, .75) # used to create many zeros later in X later in the code
+  matrix(ncol = P) # We will mask Xdense later in our code with the different levels
 # random true model
 beta <- rnorm(P) # random coefficients
 sigma <- .01 # error size
@@ -758,19 +689,30 @@ weights <- rep(1, N)
 
 Now we run the same simulations
 
-```{r, eval = FALSE}`
-Nvalue <- floor(10^seq(2, 6, by = 0.5)) # 100, 316, 1000, etc..
-# create a grid of combinatios of sparsity and N
-time_grid_N_sparse <- expand.grid(sparsity = sparsity, Nvalue = Nvalue)
+```{r, eval = FALSE}
+# Values to test
+Nvalue <- floor(10^seq(4, 6, by = 0.5)) # 100, 316, 1000, etc..
+sparsity <- c(.05, .25, .50, .75, 1) # used to create many zeros later in X later in the code
+# create a grid of combinations of sparsity and N, and an instructions if whether use the sparse verion
+time_grid_N_sparse <- expand.grid(
+  sparsity = sparsity, 
+  Nvalue = Nvalue, 
+  use_sparse = c(TRUE, FALSE)
+)
 time_grid_N_sparse$qr_time_sparse <- 0
 time_grid_N_sparse$inv_time_sparse <- 0
-for (i in seq_along(time_grid_N_sparse)) {
+for (i in 1:nrow(time_grid_N_sparse)) {
   n <- time_grid_N_sparse$Nvalue[i]
-  sparsity <- time_grid_N_sparse$sparsity[i] 
-  mask <- rbinom(n * P, 1, sparsity)
-  X <- Xdense * mask # R knows this means multiply every entery
-  t_qr <- microbenchmark(wls_qrfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 10L)
-  t_inv <- microbenchmark(wls_invfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 10L)
+  s <- time_grid_N_sparse$sparsity[i]
+  use_sparse <- time_grid_N_sparse$use_sparse[i]
+  mask <- rbinom(n * P, 1, s)
+  # this line will create assign a class to X that will determine if uses sparse algorithms or not
+  X <- (Xdense[1:n, 1:P] * mask)
+  if (use_sparse) {
+    X <- Matrix(X, sparse = use_sparse)
+  }
+  t_qr <- microbenchmark(wls_qrfit(X, y[1:n], weights[1:n]), times = 5L)
+  t_inv <- microbenchmark(wls_invfit(X, y[1:n], weights[1:n]), times = 5L)
   time_grid_N_sparse$qr_time_sparse[i] <- mean(t_qr$time)  / 1e9
   time_grid_N_sparse$inv_time_sparse[i] <- mean(t_inv$time)  / 1e9
 }
@@ -791,76 +733,95 @@ time_grid_N_sparse %>%
   knitr::kable(align = "rrrr") # for nice table format in rmarkdown
 ```
 
+We now plot the results; as expected, non-sparse method behave the same independently of the sparsity level and the sparse methods behave badly if the matrix is not sparse. Surprisingly, however, the sparse methods are overall slower than the non-sparse methods. This can only mean that the `Matrix` package routines for sparse matrices not very well optimized for the sparse case, and perhaps we should pick other algorithms.
+
+*Note about performance*: I am running the Microsoft Open R version of R, which heavily optimized and parallelized for `matrix` objects. I am also running my code on a 8 core computer, which benefits from the improvements of the Microsoft version of R. This might be the reason for the performance difference.
+
 ```{r}
 plot_data <- time_grid_N_sparse %>% 
   mutate(logN = log(Nvalue, 10)) %>% 
+  mutate(sparsity = ordered(sparsity, levels = .GlobalEnv$sparsity)) %>% 
   select(-Nvalue) %>% 
-  gather(method, seconds, -c(logN, sparsity)) 
-ggplot(plot_data, aes(x = logN, y = seconds, colour = method)) +
+  gather(method, seconds, -c(logN, sparsity, use_sparse)) 
+ggplot(plot_data) +
+  geom_line(aes(x = logN, y = seconds, colour = method, linetype = use_sparse), size = 1) +
   facet_grid(sparsity ~ .) +
-  geom_line(size = 1) +
-  # scale_colour_discrete(labels = c("Full Inverse", "QR")) + 
-  ggtitle("Effect of increasing N with P = 9 fixed") + 
+  scale_colour_discrete(labels = c("Full Inverse", "QR")) +
+  scale_linetype_discrete(labels = c("No", "Yes")) +
+  ggtitle("Effect of increasing N with P = 9 fixed, by sparsity level") + 
   theme_calc() 
 ```
-These results are consistent with our theory that said if $N$ is similar to $P$ then computation time should be efficient for the $QR$ method, but as $N >> P$, the QR algorithm needs twice as much work because it requires the factorization of $X$.
 
 
 
-<!-- Let's save our sample sparse matrix in a variable `X`: -->
-
-<!-- ```{r, cache=FALSE} -->
-<!-- library(Matrix) -->
-<!-- N <- 1e4 -->
-<!-- d <- 1e3 -->
-<!-- X <- Matrix( -->
-<!--   data = rnorm(N * d) * rbinom(N * d, 1, 0.01), -->
-<!--   nrow = N, -->
-<!--   sparse = TRUE -->
-<!-- ) -->
-<!-- X[1:5, 1:10] # sample view of X -->
-<!-- ``` -->
-
-<!-- ```{r} -->
-<!-- str(X) -->
-<!-- ``` -->
-
-<!-- We see above that the rows and columns are stores in the fields `i` and `p` of this object; the values are stored in the property `x`. -->
-
-<!-- **Methods for sparse matrices**. We will now write a few methods for sparse matrices. Basically, we will give the sparse versions of the previous methods. -->
-
-<!-- ```{r, cache=FALSE} -->
-<!-- sparse_qr_fit <- function(sparseX, y, weights) { -->
-<!--   stopifnot(inherits(sparseX, "sparseMatrix")) # check if X is sparse -->
-<!--   N <- nrow(sparseX) -->
-<!--   # 1: Adjust for weights -->
-<!--   Xtilde <- sparseX * sqrt(weights) # Xtilde is sparse! -->
-<!--   ytilde <- y * sqrt(weights) -->
-<!--   # 2: (Q-less) QR decomposition -->
-<!--   qrdecomp <- qr(Xtilde) -->
-<!--   R <- qrR(qrdecomp) # base qr fun is odd, qr.R recovers R from the odd form of qr -->
-<!--   # 3: Get RHS of linear system -->
-<!--   b <- crossprod(Xtilde, ytilde) -->
-<!--   # 4. Solve Step 1 of system -->
-<!--   z <- solve(t(R), b) # formal class system signature chooses forward solve automatically -->
-<!--   # 5. Solve Step 2 of system -->
-<!--   beta <- solve(R, z) # formal class system signature chooses backward solve automatically -->
-<!--   # Output -->
-<!--   as.numeric(beta) -->
-<!-- } -->
-<!-- ``` -->
 
 
-<!-- ```{r, cache=TRUE} -->
-<!-- beta <- rnorm(d) -->
-<!-- err <- rnorm(N, 0, .01) -->
-<!-- y <- X %*% beta + err -->
-<!-- weights <- rep(1, N) -->
-<!-- microbenchmark( -->
-<!--   wls_qrfit(as.matrix(X), y, weights), -->
-<!--   sparse_qr_fit(X, y, weights), -->
-<!--   times = 2L -->
-<!-- ) -->
-<!-- ``` -->
+### A bonus section: how to code a function that feels like `lm` in R
 
 
+This is an example of **metaprogramming** and will allow us to mimic the behaviour of `lm`. We will also add a default intercept to the model which can be removed writing `-1` just like in `lm`.
+
+```{r, warning=FALSE}
+wls <- function(model, data, weights = rep(1, nrow(data)), method = c("qr", "inverse")) {
+  # some input validation
+  stopifnot(is.data.frame(data), is.numeric(weights))
+  # make model a formula
+  model <- as.formula(model)
+  lhs <-  as.character(model)[[2]] # left side of formula
+  rhs <-  as.character(model)[[3]] # right side of formula
+  # response variable y
+  y <- data[ ,lhs]
+  # create design matrix X
+  if (rhs == ".") { # case 1: all formulas
+    X <- data[ ,-match(lhs, names(data))] # just remove y
+  } else {
+    remove_intercept <- grepl("-(.*?)1", rhs) # do we need intercept?
+    if (remove_intercept) {
+      rhs <- gsub("[ ]+(.*?)1", "", rhs) # get rid of intercept indication
+      var_names <- strsplit(rhs, "[ ]+[\\+][ ]+")[[1]] # regexps are awesome!
+      print(var_names)
+      X <- data[ ,names(data) %in% var_names, drop = FALSE]
+    } else {
+      var_names <- strsplit(rhs, "[ ]+[\\+][ ]+")[[1]] # regexps are awesome!
+      X <- data.frame(
+        `(Intercept)` = 1,
+        data[ ,names(data) %in% var_names, drop = FALSE],
+        check.names = FALSE
+      ) 
+    }
+  }
+  # run the model
+  beta <- switch(
+    method[1],
+    "qr" = wls_qrfit(as.matrix(X), y, weights),
+    "inverse" =  wls_invfit(as.matrix(X), y, weights)
+  )
+  names(beta) <- names(X)
+  # output
+  out <- list(
+    model = model,
+    coefficients = beta
+  )
+  out
+}
+```
+
+With intercept:
+
+```{r}
+wls(Sepal.Width ~ Petal.Length + Petal.Width, weights = rep(1/nrow(iris), nrow(iris)), data = iris)
+```
+
+```{r}
+lm(Sepal.Width ~ Petal.Length + Petal.Width, weights = rep(1/nrow(iris), nrow(iris)), data = iris)
+```
+
+No intercept:
+
+```{r}
+wls(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris)
+```
+
+```{r}
+lm(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris)
+```

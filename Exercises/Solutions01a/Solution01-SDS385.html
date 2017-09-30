@@ -136,41 +136,49 @@ y = X\beta + \epsilon
 \]</span> where <span class="math inline">\(W\)</span> is the diagonal matrix of weights. </strong></em></p>
 <p>The objective function we want to minimize is <span class="math display">\[
 f(\beta) = \frac{1}{2}\sum_{i=1}^N w_i (y_i - x_i^\top\beta)^2.
-\]</span> The function <span class="math inline">\(f\)</span> is a quadratic polynomial on <span class="math inline">\(\beta_1,...,\beta_P\)</span>, where the coefficient of <span class="math inline">\(\beta_i^2\)</span> is <span class="math inline">\(w_ix_i^\top x_i\)</span>. Since the <span class="math inline">\(w_i\)</span> are all positive, we already see that <span class="math inline">\(f\)</span> is a convex paraboloid. To find the minimum of this function, we only need a vector <span class="math inline">\(\hat{\beta}\)</span> satisfying first-order condition <span class="math display">\[
+\]</span> Wince the <span class="math inline">\(w_i\)</span> are all positive, we can write <span class="math inline">\(f\)</span> as <span class="math display">\[
+f(\beta) = \frac{1}{2}\sum_{i=1}^N (\sqrt{w_i}(y_i - x_i^\top\beta))^2 = \frac{1}{2} \left\lVert W^{1/2}(y - X\beta)\right\rVert^2 =  \frac{1}{2} \left(y - X\beta\right)^\top W \left(y - X\beta\right)
+\]</span> where</p>
+<ul>
+<li><span class="math inline">\(W^{1/2} = \textrm{diag}(\sqrt{w_1},...,\sqrt{w_1})\)</span> and <span class="math inline">\(W = (W^{1/2})^2\)</span></li>
+<li><span class="math inline">\(X\)</span> is the design matrix, which means that its <span class="math inline">\(i\)</span>-th row is <span class="math inline">\(x_i^\top\)</span></li>
+<li><span class="math inline">\(y\)</span> is the vector whose <span class="math inline">\(i\)</span>-th entry is <span class="math inline">\(y_i\)</span>.</li>
+</ul>
+<p>It’s evident that <span class="math inline">\(f\)</span> is a differentiable convex function, we see that in fact it is a quadratic polinomial on <span class="math inline">\(\beta\)</span> forming a paraboloid (this is because <span class="math inline">\(w_i &gt; 0\)</span> are the coefficient of the quadratic terms <span class="math inline">\(\beta_i^2\)</span>). To find the minimum of this function, we must find a vector <span class="math inline">\(\hat{\beta}\)</span> satisfying first-order condition <span class="math display">\[
 \nabla_\beta f(\hat{\beta}) = 0.
 \]</span></p>
-<p>We start by rewriting <span class="math inline">\(f\)</span> using only matrix multiplications: <span class="math display">\[
+<p>To do this, we begin by expanding the expssion for <span class="math inline">\(f\)</span> <span class="math display">\[
 \begin{aligned}
 f(\beta) &amp; = \frac{1}{2} \left\lVert W^{1/2} \left(y - X\beta\right) \right\rVert^2 \\ &amp;=
 \frac{1}{2} \left(y - X\beta)^\top W(y-X\beta\right) \\ &amp; =
-\frac{1}{2} \beta^\top X^\top W X \beta - y^\top W X  \beta + y^\top W y 
+\frac{1}{2} \beta^\top X^\top W X \beta - y^\top W X  \beta + y^\top W y,
 \end{aligned}
-\]</span> where of course <span class="math inline">\(W^{1/2} = \mathrm{diag}(\sqrt{w_1},...,\sqrt{w_N})\)</span>. These identities are easily verified since the effect of multiplying a vector by a diagonal matrix is to take the product of each entry with the corresponding element in the diagonal. With the last expression, we have arrive to a position where we can comfortably use matrix differentation to solve the first-order conditions. Matrix differentiation is simply a convenient way of computing a gradient (entry-wise derivatives) in terms of vectors and matrices. We will use the following two formulas</p>
+\]</span> and we arrive to a position where we can comfortably use matrix differentation to solve the first-order conditions. Matrix differentiation is simply a convenient way of computing a gradient (entry-wise derivatives) in terms of vectors and matrices. We will use just two basic formulas of matrix differentiation which we now recall</p>
 <hr />
 <div id="two-useful-formulas-in-matrix-differentiation" class="section level5">
 <h5>§ <em>Two useful formulas in Matrix Differentiation</em></h5>
-<p>Recall that for <span class="math inline">\(f:\mathbb{R}^n\to \mathbb{R}\)</span>, the gradient <span class="math inline">\(\nabla f:\mathbb{R}^n\to\mathbb{R}^n\)</span> is the function defined by the rule <span class="math display">\[
+<p>Given <span class="math inline">\(f:\mathbb{R}^n\to \mathbb{R}\)</span>, the gradient <span class="math inline">\(\nabla f:\mathbb{R}^n\to\mathbb{R}^n\)</span> is the function defined by the rule <span class="math display">\[
 \nabla_x f(x)=\left(\partial /\partial x_1 f(x), ..., \partial /\partial x_n f(x)\right)^\top,
-\]</span> the transpose here, usually omitted, serves to emphasize that the default is to have column vectors. The two rules we will use are:</p>
+\]</span> There are two simple often useful cases when the expression for <span class="math inline">\(f\)</span> involves matrices</p>
 <ol style="list-style-type: decimal">
 <li>If <span class="math inline">\(f(x) = x^\top A x\)</span> with <span class="math inline">\(A\in \mathbb{R}^{n\times n}\)</span> a <em>symmetric</em> matrix, then <span class="math inline">\(\nabla_x f(x) = 2Ax\)</span></li>
 <li>If <span class="math inline">\(f(x) = c^\top x\)</span> with <span class="math inline">\(c \in \mathbb{R}^n\)</span>, then <span class="math inline">\(\nabla_x f(x) = c\)</span></li>
 </ol>
 <p>The proof of these formulas is a simple direct application of entry-wise differentiation after expanding the matrix multiplication.</p>
 <hr />
-<p>With the recap of matrix derivation we can derivate our weighted-least-squares. Essentially, the first term of the objective function can be derivated with the first matrix differentation formula, the second term with the second formula, and the third one goes to zero since it doesn’t depend on <span class="math inline">\(\beta\)</span>. Hence,</p>
+<p>With the recap of matrix derivation we can derivate our weighted-least-squares solution. Essentially, the first term of the objective function can be derivated with the first matrix differentation formula, the second term with the second formula, and the third one goes to zero since it doesn’t depend on <span class="math inline">\(\beta\)</span>. Hence,</p>
 <p><span class="math display">\[
-\nabla_\beta f(\beta) = \left(X^\top W X \right)\beta -  X^\top W y
-\]</span> Thus, <span class="math display">\[
+\nabla_\beta f(\beta) = \left(X^\top W X \right)\beta -  X^\top W y,
+\]</span> whence, <span class="math display">\[
 \nabla_\beta f(\hat{\beta}) = 0 \quad \text{ if and only if } \quad
-\left(X^\top W X \right)\hat{\beta} -  X^\top W y = 0
-\]</span> or equivalently, <span class="math display">\[
- \left(X^\top W X\right) \hat{\beta} =  X^\top Wy,
-\]</span> which is the desired expression as a system of linear equations. This system is often referred to as the system of <em>normal equations</em>.</p>
+\left(X^\top W X \right)\hat{\beta} = X^\top W y = 0
+\]</span> We therefore arrive to the desired expression as a system of linear equations. This system is often referred to as the system of <em>normal equations</em>.</p>
 </div>
 </div>
 <div id="b-computing-the-solution" class="section level3">
 <h3>(B) Computing the Solution</h3>
+<div id="part-i-of-solution-theoretical-background" class="section level4">
+<h4>Part I of solution: Theoretical Background</h4>
 <p><strong><em> One way to calculate <span class="math inline">\(\beta\)</span> is to: (1) recognize that, trivially, the solution to the above linear system must satisfy <span class="math inline">\(\beta = \left(X^\top W X\right)^{-1} X^\top Wy\)</span>; and (2) to calculate this directly, i.e. by inverting <span class="math inline">\(X^\top WX\)</span>. Let’s call this the “inversion method” for calculating the WLS solution.</p>
 <p>Numerically speaking, is the inversion method the fastest and most stable way to actually solve the above linear system? Do some independent sleuthing on this question. Summarize what you ﬁnd, and provide pseudo-code for at least one alternate method based on matrix factorizations—call it “your method” for short. (Note: our linear system is not a special ﬂower; whatever you discover about general linear systems should apply here.) </strong></em></p>
 <p><strong>The Fear: Floating-point Arithmetic</strong>. Numbers appearing in arithmetic computations can be accidentaly rounded-off for a variety of reasons. Computers represent numbers using the floating-point <em>mantissa</em> representation <span class="math display">\[
@@ -188,15 +196,15 @@ f(\beta) &amp; = \frac{1}{2} \left\lVert W^{1/2} \left(y - X\beta\right) \right\
 <pre><code>## [1] NaN</code></pre>
 <p>Here’s a list of famous disasters caused by round-off errors: <a href="http://ta.twi.tudelft.nl/users/vuik/wi211/disasters.html">link</a>.</p>
 <p><strong>Our Problem: Ill Systems</strong>. Unnecessarily inverting a matrix is often considered as one of the the biggest sins in computation. Many times we only need the solution of a linear system, and fully computing the inverse of a matrix is not only innefficient, but the extra operation can actually cause many more round-off errors. This is particularly true for normal equations of the least square problem.</p>
-<p>When I worked as a statistical consultant, I once encountered an R package for Item Response Theory that yielded only errors for our data. After investigating the package’s code, I realized that error’s cause was the solution of a linear system by matrix inversion. I decided to use the singular value descomposition instead, and the package started to work as expected.</p>
-<p>Before discussing the specific case of Least Squares, I would like to introduce the general concept of <em>condition number</em> of a matrix, which is a measure of how problematic a linear system with that matrix would be, in the sense of the distortion in a solution by possible small errors.</p>
+<p>When I worked as a statistical consultant, I once encountered an R package for Item Response Theory that yielded only errors for our data. After investigating the package’s code, I realized that the error was caused by an ill-conditioned system and the wrong solutiong for linear equations. I decided to use the singular value descomposition instead, and the package started to work as expected. I first explain more about ill-conditioning and then about some methods of solution. I must assume familiarity with Linear Algebra.</p>
+<p>We now take some time to recall general concept of <em>condition number</em> of a matrix, which is a measure of how problematic a associated linear system are, in the sense of the distortion in a solution by possible small errors (e.g., round-off errors).</p>
 <hr />
 <div id="condition-number" class="section level5">
 <h5>§ <em>Condition Number</em></h5>
-<p>Let’s situate ourselves in the context of trying to solve a system of linear equations <span class="math display">\[
+<p>Let’s situate ourselves in the context of trying to solve a system of linear equations of the form <span class="math display">\[
 Ax = b.
-\]</span> We assume that <span class="math inline">\(A\in \mathbb{R}^{n\times n}\)</span> is invertible and thus a <em>unique</em> solution <span class="math inline">\(x = A^{-1}b\)</span> exists.The purpose of the condition number <span class="math inline">\(\kappa(A)\)</span> will be to measure what can happen to the solution <span class="math inline">\(x\)</span> as a small perturbation <span class="math inline">\(\epsilon\)</span> occurs in <span class="math inline">\(b\)</span>.</p>
-<p>We will start by replacing <span class="math inline">\(b\)</span> for <span class="math inline">\(\tilde{b} = b + \epsilon\)</span>. We think of <span class="math inline">\(\epsilon\)</span> as a perturbation that can arise from round-off error as discussed in the previous section. The <em>change in the solution</em> is <span class="math display">\[A^{-1}\tilde{b}- A^{-1}b = A^{-1}\epsilon.\]</span> The <em>magnitude</em> of the solution error <em>relative</em> to the input term <span class="math inline">\(b\)</span> is <span class="math display">\[
+\]</span> We first assume that <span class="math inline">\(A\in \mathbb{R}^{n\times n}\)</span> is invertible and thus a <em>unique</em> solution <span class="math inline">\(x = A^{-1}b\)</span> exists.The purpose of the condition number <span class="math inline">\(\kappa(A)\)</span> will be to measure what can happen to the solution <span class="math inline">\(x\)</span> as a small perturbation <span class="math inline">\(\epsilon\)</span> occurs in <span class="math inline">\(b\)</span> (the definitions can be generalized to perturbation in <span class="math inline">\(A\)</span> as well).</p>
+<p>We will start by replacing <span class="math inline">\(b\)</span> for a new input <span class="math inline">\(\tilde{b} = b + \epsilon\)</span>. We think of <span class="math inline">\(\epsilon\)</span> as a perturbation that can arise from round-off error as discussed in the previous section. The <em>change in the solution</em> is <span class="math display">\[A^{-1}\tilde{b}- A^{-1}b = A^{-1}\epsilon.\]</span> The <em>magnitude</em> of the solution error <em>relative</em> to the input term <span class="math inline">\(b\)</span> is <span class="math display">\[
 \frac{|\text{newsolution - solution}|}{|\text{solution}|} = \frac{\lVert A^{-1}\epsilon \lVert}{\lVert A^{-1}b\rVert}
 \]</span> We would like to compare this quantity with the <em>relative size of the error</em> <span class="math inline">\(\epsilon\)</span>, that is, we want to know the ratio <span class="math display">\[
 \frac{\frac{\lVert A^{-1}\epsilon \lVert}{\lVert A^{-1}b\rVert}}{ \frac{\lVert\epsilon\rVert}{\lVert b\rVert}} = \left(\frac{\lVert A^{-1}\epsilon\rVert}{\lVert\epsilon\rVert}\right)\left(\frac{\lVert b\rVert}{\lVert A^{-1}b\rVert}\right)
@@ -211,13 +219,13 @@ Ax = b.
 \]</span> The condition number is related to the concept of <em>singular values</em> (and hence with the singular value decomposition). For those less familar with the concept of singular values, we can take the following identities as a definition the maximum singular value <span class="math inline">\(\sigma_\max\)</span> and minimal singular value of <span class="math inline">\(\sigma_\min\)</span>: <span class="math display">\[
 \max_{\lVert v \rVert =1 }  \left\lVert A v \right\rVert = \sigma_\max(A) \quad \text{and}  \quad
 \min_{\lVert v \rVert =1 }  \left\lVert A v \right\rVert = \sigma_\min(A).
-\]</span> The following identities are very easy to verify from the above <span class="math display">\[
+\]</span> The following identities are very easy to verify <span class="math display">\[
 \sigma_\max(A) = \sigma_\min(A^{-1}) \quad \text{ and } \quad 
 \sigma_\min(A) = \sigma_\max(A^{-1})
 \]</span> This leads to the most common way of writing the condition number <span class="math display">\[
 \kappa(A) = \frac{\sigma_\max(A)}{\sigma_\min(A)}
-\]</span> Observe that a matrix with a small value of <span class="math inline">\(\sigma_{\text{min}}\)</span> will have a huge condition number, and this occurs when the columns of <span class="math inline">\(A\)</span> are close to be linearly dependent. The extreme case happens if <span class="math inline">\(A\)</span> has linearly dependent columns (and thus a non-trivial kernel); in this case <span class="math inline">\(\sigma_\min=0\)</span>, and the condition number is infinite.</p>
-<p>The lowest value that the condition number can take is <span class="math inline">\(\kappa(A)=1\)</span>. Using the last expression of condition number in terms of singular values, we can actually define it for any matrix, since the singular values always exist.</p>
+\]</span> Observe that a matrix with a small value of <span class="math inline">\(\sigma_{\text{min}}\)</span> will have a huge condition number, and this occurs when the columns of <span class="math inline">\(A\)</span> are close to be linearly dependent. The extreme case happens if <span class="math inline">\(A\)</span> has linearly dependent columns (and thus a non-trivial kernel); in this case <span class="math inline">\(\sigma_\min=0\)</span>, and the condition number is infinite. The lowest value that the condition number can take is <span class="math inline">\(\kappa(A)=1\)</span>.</p>
+<p>Using the singular value definition we can definte the condition number for any full rank matrix <span class="math inline">\(X\)</span>, even if it is not square, since every matrix has a singular value decomposition.</p>
 <hr />
 <p><strong>The Condition Number in a Least Squares Problem</strong>. The reason I wanted to argue in terms of the condition number, is because it helps to analyse what’s wrong with the system <span class="math display">\[
  \left(X^\top W X\right) \hat{\beta} =  X^\top Wy.
@@ -232,7 +240,7 @@ X^\top X = (U D V^\top)^\top (U D V^\top) = V D^\top D V^\top.
 \]</span> This is the singular value decomposition of <span class="math inline">\(X^\top X\)</span> (in fact the spectral decomposition too), and assuming <span class="math inline">\(N &gt; P\)</span>, then <span class="math inline">\(D^\top D\)</span> is a diagonal matrix whose entries are the squares of the singular values of <span class="math inline">\(X\)</span>, which happen to be the eigenvalues/singular values of <span class="math inline">\(X^\top X\)</span>. From this we conclude that <span class="math display">\[
 \kappa(X^\top X) = \left( \kappa(X) \right)^2.
 \]</span> This is why least squares can be extremely ill-conditioned with highly-correlated data.</p>
-<p><strong>What should we do then? Matrix factorization and Efficiency</strong>. The problem will remain ill-conditioned no matter the method, that’s a fact. But some methods make unnecessiry multiplications, potentially introducing more perturbation along the way. Doing less operations can be good not only in time, but protection agains errors. The traditional ethod of inverting a matrix is the full Gauss method. Many methods use the same spirit but stop along the way and to a partial factorization of a matrix, instead of fully inverting it. This partial factorization allows to solve the system more efficiently. Furthermore, some solution methods will avoid passing through <span class="math inline">\(X^\top X\)</span>, solving a system with condition number <span class="math inline">\(\kappa(X)\)</span>. Before explaining how the methods are used for the Least Squares problem, I present an overall review table of matrix factorization methods for solving linear systems of equations.</p>
+<p><strong>What should we do then? Matrix factorization and Efficiency</strong>. The problem will remain ill-conditioned no matter the method, that’s a fact. But some methods make unnecessiry multiplications, potentially introducing more perturbation along the way. Doing less operations can be good not only in time, but protection agains errors. The traditional method of inverting a matrix is the full Gauss method. Many methods use the same spirit but stop along the way and to a partial factorization of a matrix, instead of fully inverting it. This partial factorization allows to solve the system more efficiently. Furthermore, some solution methods will avoid passing through <span class="math inline">\(X^\top X\)</span>, solving a system with condition number <span class="math inline">\(\kappa(X)\)</span>. Before explaining how the methods are used for the Least Squares problem, I present an overall review table of matrix factorization methods for solving linear systems of equations.</p>
 <hr />
 </div>
 <div id="matrix-factorization-methods-for-solving-linear-systems" class="section level5">
@@ -267,14 +275,14 @@ X^\top X = (U D V^\top)^\top (U D V^\top) = V D^\top D V^\top.
 <td>LU decomposition</td>
 <td align="center"><span class="math inline">\(\approx \frac{2}{3} n^3\)</span></td>
 <td>Finds <span class="math inline">\(A=LU\)</span> with <span class="math inline">\(L\)</span> and <span class="math inline">\(U\)</span> lower and upper triangular respectively; after that solves <span class="math inline">\(Lz = b\)</span> and then <span class="math inline">\(Ux = z\)</span></td>
-<td>Triangular systems are efficient and easy to solve</td>
+<td>Triangular systems are efficient and easy to solve with the algorithms of forward and backward substition</td>
 <td>Gaussian Elimination</td>
 </tr>
 <tr class="odd">
 <td>QR factorization</td>
 <td align="center"><span class="math inline">\(\approx \frac{4}{3} n^3\)</span></td>
 <td>Finds <span class="math inline">\(A=QR\)</span> with <span class="math inline">\(Q\)</span> orthogonal and <span class="math inline">\(R\)</span> upper triangular respectively; then solve triangular system <span class="math inline">\(Rx = Q^\top b\)</span></td>
-<td>Better for some cases, note that we are using that <span class="math inline">\(Q^{-1} = Q^\top\)</span></td>
+<td>Tends to be much more stable since the factorization is obtained by applying a sequence of norm-preserving rotations/reflections.</td>
 <td>Householder reflections</td>
 </tr>
 <tr class="even">
@@ -295,15 +303,21 @@ X^\top X = (U D V^\top)^\top (U D V^\top) = V D^\top D V^\top.
 </table>
 <p>These methods are described thoroughly in any Numerical Analysis book.</p>
 <hr />
+</div>
+</div>
+<div id="part-i-of-solution-theoretical-background-1" class="section level4">
+<h4>Part I of solution: Theoretical Background</h4>
 <p><strong>Ok, so which one to use for WLS? </strong>. From the above, the LU decomposition is rearly used because it requires computing <span class="math inline">\(X^\top WX\)</span> directly, and in this case the Cholesky decomposition is usually better. In order to know which one is preferred, we need to consider the stability of its method.</p>
-<p>The table above shows that the most efficient method is the Cholesky decomposition. But there’s a catch: having to compute <span class="math inline">\(X^\top WX\)</span> squares the condition number (easy to check using the SVD decomposition), so it is actually unstable for ill-conditiones systems.</p>
+<p>The table above shows that the most efficient method is the Cholesky decomposition. But there’s a catch: having to compute <span class="math inline">\(X^\top WX\)</span> squares the condition number as we previously discussed, also Cholesky’s algorithms is known to be more prone to round-off errors, so it turns out to be bad for ill-conditioned problems.</p>
+<p>Note that algorithms will be classified on whether they compute <span class="math inline">\(X^\top W X\)</span> first. We can expect this operation to be of the order of <span class="math inline">\(NP^2\)</span>.</p>
 <p><em>Conclusion</em>. It basically boils down to choosing between Cholesky, SVD and QR, here’s a comparison.</p>
-<table>
+<table style="width:100%;">
 <colgroup>
-<col width="18%"></col>
-<col width="22%"></col>
-<col width="16%"></col>
-<col width="32%"></col>
+<col width="17%"></col>
+<col width="20%"></col>
+<col width="15%"></col>
+<col width="30%"></col>
+<col width="8%"></col>
 <col width="8%"></col>
 </colgroup>
 <thead>
@@ -313,6 +327,7 @@ X^\top X = (U D V^\top)^\top (U D V^\top) = V D^\top D V^\top.
 <th>Stability</th>
 <th>When to choose</th>
 <th>Needs <span class="math inline">\(X^\top WX\)</span></th>
+<th>Total cost</th>
 </tr>
 </thead>
 <tbody>
@@ -322,6 +337,7 @@ X^\top X = (U D V^\top)^\top (U D V^\top) = V D^\top D V^\top.
 <td>Bad for ill-conditioned problems</td>
 <td>Speed if you algo want <span class="math inline">\(X^\top WX\)</span>. Not very popular</td>
 <td>Yes</td>
+<td><span class="math inline">\(NP^2 + P^3/3\)</span></td>
 </tr>
 <tr class="even">
 <td>QR factorisation</td>
@@ -329,6 +345,7 @@ X^\top X = (U D V^\top)^\top (U D V^\top) = V D^\top D V^\top.
 <td>Good stability</td>
 <td>Most of the time. Good for sparse matrices (see below). Default method in R and Matlab</td>
 <td>No</td>
+<td><span class="math inline">\(2NP^2 − 2P^3/3\)</span></td>
 </tr>
 <tr class="odd">
 <td>SVD decomposition</td>
@@ -336,38 +353,37 @@ X^\top X = (U D V^\top)^\top (U D V^\top) = V D^\top D V^\top.
 <td>The best</td>
 <td>Very ugly problems</td>
 <td>No</td>
+<td><span class="math inline">\(2NP^2 + 11N^3\)</span></td>
 </tr>
 </tbody>
 </table>
-<p><strong>Using the the QR decomposition for WLS</strong>. Since it is the default method in R and Matlab. I will very roughly explain how to use it.</p>
-<p><em><strong>Case 1</strong>: <span class="math inline">\(W\)</span> is the identity matrix</em>. Just so that the idea is clear, I will first do this case and then show how to include the weights. The equation we want to solve is <span class="math display">\[
-\left(X^\top X\right) \hat{\beta} = X^\top y
-\]</span> Perform the QR decomposition of <span class="math inline">\(X\)</span> which consists of a factorisation <span class="math display">\[
-X = QR
-\]</span> with <span class="math inline">\(Q\)</span> an orthogonal matrix and <span class="math inline">\(R\)</span> upper triangular. The columns of an orthogonal matrix have orthonormal columns, so <span class="math inline">\(Q^\top Q = I_n\)</span>, implying that the transpose is its own inverse. We see how the system will simplify <span class="math display">\[
-X^\top X = R^\top Q^\top Q R = R^\top R
-\]</span></p>
-<p>So the resulting system is</p>
+<p>If <span class="math inline">\(N\)</span> is similar to <span class="math inline">\(P\)</span>, then Cholesky and QR require about the same amount of work. This is because although Cholesky is faster, the extra cost of computing <span class="math inline">\(X^\top W X\)</span> compensates the advantages. However, if <span class="math inline">\(N &gt;&gt; P\)</span>, we expect the QR factorization to be as much as twice the work. Choosing a method depends on how well-conditioned the problem is. The SVD is known to be the most stable, but it is many times more expensive; if <span class="math inline">\(X\)</span> is rank-defficient, this might be the only way (although having <span class="math inline">\(X\)</span> rank-defficient may have us reconsidering if least squares is the best approach).</p>
+</div>
+<div id="part-ii-of-solution-implementing-the-qr-factorization" class="section level4">
+<h4>Part II of solution: Implementing the QR factorization</h4>
+<p><strong>Using the the QR decomposition for WLS</strong>. First of all, let us recall that we only need solve the case where <span class="math inline">\(W\)</span> is <span class="math inline">\(I_N\)</span> the identity matrix, since in any other case, we can define <span class="math inline">\(\tilde{X} = W^{1/2} X\)</span> and <span class="math inline">\(\tilde{y} = W^{1/2}y\)</span> and the normal equations system becomes <span class="math display">\[
+\tilde{X}^\top\tilde{X}=\tilde{X}^\top\tilde{y}.
+\]</span> Again, we will drop the tilde notation for simplicity.</p>
+<p>The first step is obtaining the QR decomposition of <span class="math inline">\(X\)</span> which consists of the factorization</p>
 <p><span class="math display">\[
-\left(R^\top R\right) \hat{\beta} = X^\top y
-\]</span> You might think it look similar, but now we only have to solve a lower triangular and an upper triangular system. Each one using the forward or backward subtitution algorithm takes.</p>
-<ul>
-<li><em>Step 1:</em> Solve the lower triangular system <span class="math inline">\(R^\top z = X^\top y\)</span> with forward subtitution.</li>
-<li><em>Step 2:</em> Solve the upper triangular system <span class="math inline">\(R\hat{\beta} = z\)</span> with backward subtitution.</li>
-</ul>
+X = QR
+\]</span> with <span class="math inline">\(Q\)</span> an orthogonal matrix and <span class="math inline">\(R\)</span> upper triangular. The columns of an orthogonal matrix have orthonormal columns, so <span class="math inline">\(Q^\top Q = I_N\)</span>, implying that the transpose is its own inverse. We see how the system will simplify <span class="math display">\[
+X^\top X = R^\top Q^\top Q R = R^\top R
+\]</span> Plugging-in back into the normal equations we have <span class="math display">\[
+\left(R^\top R\right) \hat{\beta} = X^\top y = R^\top Q^\top y.
+\]</span> The above system can already be solves efficiently solving two triangular systems with forward and backward substitution. However, as long as <span class="math inline">\(X\)</span> is full rank, it is well known that the resulting matrix <span class="math inline">\(R\)</span> is invertible, so it further simplifies to <span class="math display">\[
+R \hat{\beta} = Q^\top y.
+\]</span></p>
 <p>Two observations about the <span class="math inline">\(QR\)</span> method:</p>
 <ol style="list-style-type: decimal">
-<li>We don’t to store <span class="math inline">\(Q\)</span>, and by doing this, we save a few steps and memory. Sometimes this is referred to as the <span class="math inline">\(Q\)</span>-less <span class="math inline">\(QR\)</span>-decomposition.</li>
-<li>This method is good if <span class="math inline">\(X\)</span> is <em>sparse</em> (very few non-zero values), since $ X^y$ and the backward/forward substitution methods can be computed using sparse matrices multiplication techniques.</li>
+<li>If <span class="math inline">\(X\)</span> is sparse and large, then the form <span class="math inline">\(\left(R^\top R\right) \hat{\beta} = X^\top y\)</span> is can be better. Since <span class="math inline">\(Q\)</span> might turnout dense and computing <span class="math inline">\(X^\top y\)</span> would be faster than <span class="math inline">\(Q^\top y\)</span>. Also, in this way we don’t need to store <span class="math inline">\(Q\)</span>, useful for large dimensions. Sometimes this is referred to as the <span class="math inline">\(Q\)</span>-less <span class="math inline">\(QR\)</span>-decomposition.</li>
+<li>If we reanalyze the expression <span class="math display">\[
+R \hat{\beta} = Q^\top y,
+\]</span> we see that–not surprisingly–it is equivalent to <span class="math display">\[
+ (QR) \hat{\beta} = X \hat{\beta} = y.
+\]</span> Most computing language include routines for solving systems of equations efficiently using the <span class="math inline">\(QR\)</span> algorithm. In <code>R</code> we have the function <code>qr.solve</code>, which may be directly called with inputs <span class="math inline">\(X\)</span> and <span class="math inline">\(y\)</span>, as justified by the equation above. In fact QR solvers always yield the least squares approximation, even if there is no solution.</li>
 </ol>
-<p><em><strong>Case 2</strong>: General <span class="math inline">\(W\)</span></em>. All we have to do is a little modification before performing the <span class="math inline">\(QR\)</span> decomposition. That is, we must multiply each row of <span class="math inline">\(X\)</span> by square root of the corresponding weight. Let <span class="math inline">\(W^{1/2}\)</span> be the diagonal matrix with square-rooted weights <span class="math inline">\(W^{1/2}=\mathrm{diag}\left(\sqrt{w_1}, ..., \sqrt{w_N}\right)\)</span>. Then if <span class="math display">\[
-\tilde{X} = W^{-1/2}X = QR
-\]</span> Then <span class="math display">\[
-X^\top W X = R^\top R
-\]</span> So we have to solve the system <span class="math display">\[
-\left(R^\top R\right) \hat{\beta} = X^\top W y
-\]</span> And we can use the two-step technique of the simpler previous case.</p>
-<p><strong>The pseudo-algorithm</strong> As a conclusion here’s the pseudocode for using the <span class="math inline">\(QR\)</span> decomposition for WLS.</p>
+<p><strong>The pseudo-algorithm</strong> As a conclusion here’s the pseudocode for using the <span class="math inline">\(QR\)</span> decomposition for WLS:</p>
 <pre><code>Input: 
   X: Design matrix of Nxd
   y: Independent variable vector of Nx1
@@ -376,342 +392,352 @@ Output:
   beta: The coefficients of the weighted linear regression y ~ X*beta with weights w.
 
 Algorithm:
-  1. Obtain Xtilde multiplying each row i of X by the corresponding sqrt(w_i)
-  2. Obtain an upper triangular matrix R from the Q-less QR decomposition on Xtilde 
-  3. Compute b=Xtilde'*ytilde where ytilde is obtained from multiplying each entry i of y by sqrt(w_i)
-  4. Obtain z solving the system R'*z = b by forward substitution
-  5. Obtain beta solving the system R*beta = z using backward substitution
-  6. Return beta</code></pre>
+  1. Obtain Xtilde and ytilde multiplying each row/entry i by the corresponding sqrt(w_i).
+  2. Obtain the QR decomposition of Xtilde = QR.
+  3. Compute the RHS of the linear system b= Q'*ytilde.
+  4. Obtain beta_hat solving R*beta = b using backward substitution.
+  5. Return beta_hat.</code></pre>
+<p>As mentioned before, parts 2-4 will be implemented in a single step using the <span class="math inline">\(qr\)</span> solver of R, since it uses heavily optimized LAPACK routines.</p>
+<p><em>Note</em>: The only differnece with a version for sparse matrices would be to use the <span class="math inline">\(Q\)</span>-less <span class="math inline">\(QR\)</span> decomposition instead and solving the double triangular system as commented above. Again, this is already included is efficient solvers for sparse matrices in most languages. We will talk more about sparse matrices and define them in following sections.</p>
 </div>
 </div>
 <div id="c-coding-and-testing-with-simulated-and-iris-data" class="section level3">
 <h3>(C) Coding and testing with simulated and iris data</h3>
-<p>We will code in R the proposed QR factorization for weighted least squares. We will use standard R functions for this. <em>Note</em>: This is actually the default method used by the function <code>lm</code> but we will reproduce it here. The programming style will focus on clarity rather than speed in R.</p>
+<p>We now directly implement the recipe we gave in the previous section.</p>
 <p><strong>Programming our QR method</strong></p>
-<pre class="r"><code>#' @title Weighted Least Squares Regression
-#' @description This functions fits a model of the form
+<pre class="r"><code>#' @title Weighted Least Squares with QR Factorization
+#' @description 
+#' Uses QR factorization to fit the model
 #'   y_i ~ x_i'b,
-#' where the coefficients beta are obtained from the weighted least squares problem **min_b sum_i(w_i(y_i - x_i'b)^2)**. 
-#' This function uses matrix computations to fit the model. If the design matrix uses package Matrix, then corresponding efficient algorithms are implementd.
+#' where the coefficients beta are obtained from the weighted least squares problem **min_b sum_i(w_i(y_i - x_i'b)^2)**
+#' @details 
+#' This function uses matrix computations to fit the WLS model. The design matrix X must be a numeric matrix or a formal object of the package Matrix. A QR solver is used to solve R*beta_hat = Q'*y.
 #' @params
-#'   X a numeric matrix containing the design matrix of input/independent variables: rows represent individuals and columns variables
-#'   y a numeric vector containing the individual observations from the response/dependent variable   
-#'   weights a numeric vector of weights yo be assigned to each individual. Assigns equal weights by default.
-wls_fit &lt;- function(X, y, weights) {
-  N &lt;- nrow(X)
-  X &lt;- as.matrix(X) # this way it works for vector/matrix/data.frame
-  # 1: Prepare for QR
-  Xtilde &lt;- X * sqrt(weights) # R is smart, multiplies every row like this
-  # 2: QR decomposition
-  qrdecomp &lt;- qr(Xtilde, LAPACK = TRUE)
-  R &lt;- qr.R(qrdecomp) # base qr fun is odd, qr.R recovers R from the odd form of qr
-  # 3: Get RHS of linear system
+#'   X: the design matrix of predictor/independent variable. X is expected to be a numeric matrix, or a formal object inheriting from Matrix class of the Matrix package. 
+#'   y: a numeric vector containing the individual observations from the response/dependent variable   
+#'   weights: a numeric vector of weights yo be assigned to each individual. Assigns equal weights by default.
+#' @value a vector with the values of the cofficients of the weighte least squares regression
+wls_qrfit &lt;- function(X, y, weights = rep(1, length(y))) {
+  # Input data type validation
+  stopifnot(
+    inherits(X, c(&quot;matrix&quot;, &quot;Matrix&quot;)), # inherits allows class inheritence
+    is.numeric(y), is.numeric(weights) # y and weights must be numeric
+  )
+  # 1. Set up as unweighted problem
+  Xtilde &lt;- X * sqrt(weights) # I am using R's smart vectorized broadcasting rules
   ytilde &lt;- y * sqrt(weights)
-  b &lt;- t(Xtilde) %*% ytilde
-  # 4. Solve Step 1 of system
-  z &lt;- forwardsolve(t(R), b)
-  # 5. Solve Step 2 of system
-  beta &lt;- backsolve(R, z)
-  # Output
-  as.numeric(beta)
+  # 2-4. QR solver
+  qr_decomp &lt;- qr(Xtilde, LAPACK = TRUE)
+  beta_hat &lt;- qr.coef(qr_decomp, ytilde)
+  # 5. Output
+  beta_hat
 }</code></pre>
-<p>Just to tame sure it works fine, here’s a comparison with the <code>lm</code> method using the famous iris database.</p>
+<p>Just to make sure it works fine, here’s a comparison with R;s default <code>lm.fit</code> method using the famous iris database.</p>
+<p>Some packages:</p>
+<pre class="r"><code>library(tidyverse) # for readable code and better workflow</code></pre>
+<p>The data:</p>
 <pre class="r"><code>data(iris)
-X &lt;- iris[ ,c(&quot;Petal.Length&quot;, &quot;Petal.Width&quot;)]
-y &lt;- iris[ ,&quot;Sepal.Width&quot;]
-weights &lt;- rep(1, nrow(X))
-wls_fit(X, y, weights)</code></pre>
+X &lt;- iris %&gt;% 
+  select(Petal.Length, Petal.Width) %&gt;% # subset of variables
+  as.matrix() 
+y &lt;- iris %&gt;% 
+  pull(Sepal.Width) # pull is like select but output is a vector
+weights &lt;- rep(1, nrow(X)) # equal weights for test</code></pre>
+<p>Results</p>
+<pre class="r"><code>wls_qrfit(X, y, weights) %&gt;% 
+  print()</code></pre>
 <pre><code>## [1]  1.723813 -3.196153</code></pre>
-<pre class="r"><code>lm(Sepal.Width ~ Petal.Length + Petal.Width - 1, weights = weights, data = iris)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris, 
-##     weights = weights)
-## 
-## Coefficients:
-## Petal.Length   Petal.Width  
-##        1.724        -3.196</code></pre>
-<p>In the next bonus subsection we define a <code>wls</code> function that calls <code>wls_fit</code> but receives a formula just like R’s <code>lm</code>. This is similar to what <code>lm</code> method does calling the<code>lm.fit</code> function. This is not part of the homework, so the reader may skip it. It is just fun.</p>
+<pre class="r"><code>lm.wfit(X, y , weights) %&gt;% # note that lm.wfit does not behave well with package Matrix
+  .[[&quot;coefficients&quot;]] %&gt;% # since output is a list, this extracts coefficients
+  print()</code></pre>
+<pre><code>## Petal.Length  Petal.Width 
+##     1.723813    -3.196153</code></pre>
+<p>In the next bonus subsection we define a <code>wls</code> function that calls <code>wls_qrfit</code> but receives a formula just like R’s <code>lm</code>. This is similar to what <code>lm</code> method does calling the<code>lm.fit</code> function. This is not part of the homework, so the reader may skip it. It is just fun.</p>
 <p>Finally, for the sake of completion, I want to include what should be the fastest, the Cholesky decomposition <span class="math inline">\((X^\top W X)=LL^\top\)</span>. I want go through the exact details but is similar to what we’ve done using triangular systems.</p>
 <p><strong>Comparisons with the inversion method and R’s default functions</strong></p>
-<p>Matrix inversion is usually performed efficiently using the LU decomposition, which is a partial Gaussian elimination method. In R, inversion is done using the <code>solve</code> function without calling additional arguments.</p>
-<pre class="r"><code>inv_fit &lt;- function(X, y, weights) {
-  # system inputs
-  X &lt;- as.matrix(X)
-  A &lt;- t(X) %*% (X * weights) # system matrix
-  A_inv &lt;- chol2inv(A) # inverse using cholesky, which exploits symmetric pos def
-  b &lt;- t(X) %*% (y * weights) # right hand side of system
-  # solution
-  beta &lt;- A_inv %*% b # system solution
-  # output
-  as.numeric(beta)
-} </code></pre>
-<p>We get the same results as before:</p>
-<pre class="r"><code>inv_fit(X, y, weights)</code></pre>
-<pre><code>## [1]  0.0003670862 -0.0003449560</code></pre>
-<p><strong>Comparison 1: iris</strong></p>
-<p>This is a small dataset that will server as warmup. We will the package <code>microbenchmark</code> to compare performance</p>
-<pre class="r"><code>library(microbenchmark)</code></pre>
-<pre class="r"><code>data(iris)
-X &lt;- as.matrix(iris[ ,c(&quot;Petal.Length&quot;, &quot;Petal.Width&quot;)])
-y &lt;- iris[ ,&quot;Sepal.Width&quot;]
-weights &lt;- rep(1, nrow(X))
-microbenchmark(
-  inv_fit(X, y, weights),
-  wls_fit(X, y, weights),
-  lm.wfit(X, y, weights),
-  times=100L
-)</code></pre>
-<pre><code>## Unit: microseconds
-##                    expr    min     lq      mean  median      uq      max
-##  inv_fit(X, y, weights) 20.133 23.686  77.66120 26.8445 28.8180 5129.862
-##  wls_fit(X, y, weights) 65.531 70.662 157.30725 73.4255 76.5840 8356.207
-##  lm.wfit(X, y, weights) 39.871 45.792  51.76912 50.1350 54.2795  124.349
-##  neval
-##    100
-##    100
-##    100</code></pre>
-<p>For the first test, it seems that the inversion method is actually not bad at all, compare to R default’s <code>lm.wfit</code>. We recall that this does not justify it’s use, since for the condition number of corresponding system squares, potentially leading to much higher rounding errors. Nevertheless, the use of LU compensates the higher number of instructions required for the qr method. We also emphasize that out <code>wls_fit</code> actually uses <code>lm</code>’s <code>lm.wfit</code>. The difference is that this function comes “precompiled”, and does not waste time calling interpreting higher level calls tu functions.</p>
-<p><strong>Mid size simulated data</strong></p>
-<p>Ok, so let’s simulate a moderate dense database from a theoretical model.</p>
-<pre class="r"><code>N &lt;- 1e4 # 10,000 observations
-d &lt;- 1e2 # 100 variables
-beta &lt;- rnorm(d) # random coefficients
-sigma &lt;- .01 # error size
-# X &lt;- matrix(rnorm(N * d), ncol = d) # very large random design matrix, size ~ 769.2MB
-# y &lt;- X %*% beta + rnorm(N, sd = sigma)
-# weights &lt;- rep(1, N)
-# microbenchmark( # now this will take a while
-#   inv_fit(X, y, weights),
-#   wls_fit(X, y, weights),
-#   lm.wfit(X, y, weights),
-#   times=10L
-# )</code></pre>
-<p><strong>Large simulated data</strong></p>
-<p>Time to cruch (this actually takes a few hours using a i7 processor).</p>
-<pre class="r"><code>N &lt;- 1e5 # 100,000 observations
-d &lt;- 1e4 # 10,000 variables
-beta &lt;- rnorm(d) # random coefficients
-sigma &lt;- .01 # error size
-# X &lt;- matrix(rnorm(N * d), ncol = d) # very large random design matrix, size ~ 769.2MB
-# y &lt;- X %*% beta + rnorm(N, sd = sigma)
-# weights &lt;- rep(1, N)
-# microbenchmark( # now this will take a while
-#   inv_fit(X, y, weights),
-#   wls_fit(X, y, weights),
-#   lm.wfit(X, y, weights),
-#   times=2L
-# )</code></pre>
-<div id="bonus-subsection-use-metaprogramming-to-make-it-work-just-like-the-lm-function-of-r" class="section level4">
-<h4>(Bonus subsection) Use metaprogramming to make it work just like the lm function of R</h4>
-<p>This is an example of <strong>metaprogramming</strong> and will allow us to mimic the behaviour of <code>lm</code>. We will also add a default intercept to the model which can be removed writing <code>-1</code> just like in <code>lm</code>.</p>
-<pre class="r"><code>wls &lt;- function(model, data, weights = rep(1, nrow(data))) {
-  # some input validation
-  stopifnot(is.numeric(weights), length(weights) == nrow(data))
-  # make model a formula
-  model &lt;- as.formula(model)
-  lhs &lt;-  as.character(model)[[2]] # left side of formula
-  rhs &lt;-  as.character(model)[[3]] # right side of formula
-  # response variable y
-  y &lt;- data[ ,lhs]
-  # create design matrix X
-  if (rhs == &quot;.&quot;) { # case 1: all formulas
-    X &lt;- data[ ,-match(lhs, names(data))] # just remove y
-  } else {
-    remove_intercept &lt;- grepl(&quot;-(.*?)1&quot;, rhs) # do we need intercept?
-    if (remove_intercept) {
-      rhs &lt;- gsub(&quot;[ ]+(.*?)1&quot;, &quot;&quot;, rhs) # get rid of intercept indication
-      var_names &lt;- strsplit(rhs, &quot;[ ]+[\\+][ ]+&quot;)[[1]] # regexps are awesome!
-      print(var_names)
-      X &lt;- data[ ,names(data) %in% var_names, drop = FALSE] 
-    } else {
-      var_names &lt;- strsplit(rhs, &quot;[ ]+[\\+][ ]+&quot;)[[1]] # regexps are awesome!
-      X &lt;- data.frame(
-        `(Intercept)` = 1,
-        data[ ,names(data) %in% var_names, drop = FALSE],
-        check.names = FALSE
-      )
-    }
-  }
-  # run the model 
-  beta &lt;- wls_fit(X, y, weights)
-  names(beta) &lt;- names(X)
-  # output
-  out &lt;- list(
-    model = model,
-    coefficients = beta
+<p>Matrix inversion is usually performed with full Gaussian Elimination and other times with a combination of matrix factorization with the additional steps of solving elementary equations. In R, inversion is done using the <code>solve</code> function without calling additional arguments, and that is what we will use, in a function along the lines of our previous QR method.</p>
+<pre class="r"><code>#' @title Weighted Least Squares by Matrix Inversion
+#' @description 
+#' Uses QR factorization to solve fit the model
+#'   y_i ~ x_i'b,
+#' where the coefficients beta are obtained from the weighted least squares problem **min_b sum_i(w_i(y_i - x_i'b)^2)**
+#' @details 
+#' This function uses matrix computations to fit the WLS model. The design matrix X must be a formal object of the package Matrix; these guarantees appropriate and efficient internal algorithms. The function reweights X and y by rows/entries according to sqrt(weights), and solves (X'X)beta = X'y by inverting X'X using the cholesky decomposition of the Matrix package.
+#' @params
+#'   X: the design matrix of predictor/independent variable. X is expected to be a numeric matrix, or a formal object inheriting from Matrix class of the Matrix package. 
+#'   y: a numeric vector containing the individual observations from the response/dependent variable   
+#'   weights: a numeric vector of weights yo be assigned to each individual. Assigns equal weights by default.
+#' @value a vector with the values of the cofficients of the weighte least squares regression
+wls_invfit &lt;- function(X, y, weights) {
+  # Data type validation
+  stopifnot(
+    inherits(X, c(&quot;matrix&quot;, &quot;Matrix&quot;)), # inherits allows class inheritence
+    is.numeric(y), is.numeric(weights) # y and weights must be numeric;
   )
-  out
-}</code></pre>
-<p>With intercept:</p>
-<pre class="r"><code>wls(Sepal.Width ~ Petal.Length + Petal.Width, weights = rep(1/nrow(iris), nrow(iris)), data = iris)</code></pre>
-<pre><code>## $model
-## Sepal.Width ~ Petal.Length + Petal.Width
-## 
-## $coefficients
-##  (Intercept) Petal.Length  Petal.Width 
-##    -75.09832    112.98592    150.41322</code></pre>
-<pre class="r"><code>lm(Sepal.Width ~ Petal.Length + Petal.Width, weights = rep(1/nrow(iris), nrow(iris)), data = iris)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = Sepal.Width ~ Petal.Length + Petal.Width, data = iris, 
-##     weights = rep(1/nrow(iris), nrow(iris)))
-## 
-## Coefficients:
-##  (Intercept)  Petal.Length   Petal.Width  
-##       3.5870       -0.2571        0.3640</code></pre>
-<p>No intercept:</p>
-<pre class="r"><code>wls(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris)</code></pre>
-<pre><code>## [1] &quot;Petal.Length&quot;</code></pre>
-<pre><code>## $model
-## Sepal.Width ~ Petal.Length + Petal.Width - 1
-## 
-## $coefficients
-## Petal.Length 
-##    0.6482726</code></pre>
-<pre class="r"><code>lm(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris)
-## 
-## Coefficients:
-## Petal.Length   Petal.Width  
-##        1.724        -3.196</code></pre>
-</div>
-</div>
-<div id="d-the-sparse-world" class="section level3">
-<h3>(D) The Sparse World</h3>
-<p>A <em>sparse matrix</em> <span class="math inline">\(A\)</span> is a matrix in which most elements are zero. A consequence is that traditional algorithms waste too much energy with unnecessary loops when handling these matrices. These matrices are usually represented more efficially as lists, each entry containing a row, a column, and a value. For example: <span class="math display">\[
-\begin{bmatrix}
-0 &amp; 0 &amp; 0 &amp; 0 &amp; 9 &amp; 0 \\
-0 &amp; 9 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
-4 &amp; 0 &amp; 0 &amp; 2 &amp; 0 &amp; 0 \\
-0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 5 \\
-0 &amp; 0 &amp; 2 &amp; 0 &amp; 0 &amp; 0 
-\end{bmatrix}
-\]</span> becomes</p>
-<table>
-<thead>
-<tr class="header">
-<th align="center"><em>nrows</em></th>
-<th align="center"><em>ncolumns</em></th>
-<th align="center"><em>nvalues</em></th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">5</td>
-<td align="center">6</td>
-<td align="center">6</td>
-</tr>
-</tbody>
-</table>
-<table>
-<thead>
-<tr class="header">
-<th align="center"><em>row</em></th>
-<th align="center"><em>column</em></th>
-<th align="center"><em>value</em></th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">1</td>
-<td align="center">5</td>
-<td align="center">9</td>
-</tr>
-<tr class="even">
-<td align="center">2</td>
-<td align="center">2</td>
-<td align="center">8</td>
-</tr>
-<tr class="odd">
-<td align="center">3</td>
-<td align="center">1</td>
-<td align="center">4</td>
-</tr>
-<tr class="even">
-<td align="center">3</td>
-<td align="center">3</td>
-<td align="center">2</td>
-</tr>
-<tr class="odd">
-<td align="center">4</td>
-<td align="center">6</td>
-<td align="center">5</td>
-</tr>
-<tr class="even">
-<td align="center">5</td>
-<td align="center">3</td>
-<td align="center">2</td>
-</tr>
-</tbody>
-</table>
-<p>Algorithms for sparse matrices adapt to this type of internal data representation. If a sparse matrix algorithm is used with a dense matrix, then it will less efficient, but they are typically much faster for sparse matrices.</p>
-<p>In R, the library <code>Matrix</code> handles sparse matrices, having a special S4 class. For the uninitiated is R’s formal S4 classes, the thing to remember is that implication of having a class is that multiplication, summation, and many function can automatically identify if the input matrix is of this class, and then call appropriate corresponding algorithm.</p>
-<p>Let’s save our sample sparse matrix in a variable <code>X</code>:</p>
-<pre class="r"><code>library(Matrix)
-N &lt;- 1e4
-d &lt;- 1e3
-X &lt;- Matrix(
-  data = rnorm(N * d) * rbinom(N * d, 1, 0.01),
-  nrow = N,
-  sparse = TRUE
-)
-X[1:5, 1:10] # sample view of X</code></pre>
-<pre><code>## 5 x 10 sparse Matrix of class &quot;dgCMatrix&quot;
-##                         
-## [1,] . . . . . . . . . .
-## [2,] . . . . . . . . . .
-## [3,] . . . . . . . . . .
-## [4,] . . . . . . . . . .
-## [5,] . . . . . . . . . .</code></pre>
-<pre class="r"><code>str(X)</code></pre>
-<pre><code>## Formal class 'dgCMatrix' [package &quot;Matrix&quot;] with 6 slots
-##   ..@ i       : int [1:99783] 19 209 321 508 526 610 742 750 768 1074 ...
-##   ..@ p       : int [1:1001] 0 105 199 301 401 514 631 738 815 903 ...
-##   ..@ Dim     : int [1:2] 10000 1000
-##   ..@ Dimnames:List of 2
-##   .. ..$ : NULL
-##   .. ..$ : NULL
-##   ..@ x       : num [1:99783] -1.582 -1.418 0.949 0.442 -0.839 ...
-##   ..@ factors : list()</code></pre>
-<p>We see above that the rows and columns are stores in the fields <code>i</code> and <code>p</code> of this object; the values are stored in the property <code>x</code>.</p>
-<p><strong>Methods for sparse matrices</strong>. We will now write a few methods for sparse matrices. Basically, we will give the sparse versions of the previous methods.</p>
-<pre class="r"><code>sparse_qr_fit &lt;- function(sparseX, y, weights) {
-  stopifnot(inherits(sparseX, &quot;sparseMatrix&quot;)) # check if X is sparse
-  N &lt;- nrow(sparseX)
-  # 1: Adjust for weights
-  Xtilde &lt;- sparseX * sqrt(weights) # Xtilde is sparse!
+  # 1. Set up as unweighted problem
+  Xtilde &lt;- X * sqrt(weights) 
   ytilde &lt;- y * sqrt(weights)
-  # 2: (Q-less) QR decomposition
-  qrdecomp &lt;- qr(Xtilde)
-  R &lt;- qrR(qrdecomp) # base qr fun is odd, qr.R recovers R from the odd form of qr
-  # 3: Get RHS of linear system
-  b &lt;- crossprod(Xtilde, ytilde)
-  # 4. Solve Step 1 of system
-  z &lt;- solve(t(R), b) # formal class system signature chooses forward solve automatically
-  # 5. Solve Step 2 of system
-  beta &lt;- solve(R, z) # formal class system signature chooses backward solve automatically
-  # Output
-  as.numeric(beta)
+  # 2. Gaussian elimination for matrix inverse
+  inverse &lt;- solve(crossprod(Xtilde)) # compute (X'X)^(-1)
+  # 3. Solve the linear system
+  beta_hat &lt;- inverse %*% (crossprod(Xtilde, ytilde)) # system solution
+  # output
+  drop(beta_hat)
 }</code></pre>
-<pre class="r"><code>beta &lt;- rnorm(d)
-err &lt;- rnorm(N, 0, .01)
-y &lt;- X %*% beta + err
-weights &lt;- rep(1, N)
-microbenchmark(
-  wls_fit(as.matrix(X), y, weights),
-  sparse_qr_fit(X, y, weights),
-  times = 2L
-)</code></pre>
-<pre><code>## Unit: seconds
-##                               expr       min        lq      mean    median
-##  wls_fit(as.matrix(X), y, weights)  3.425217  3.425217  3.582061  3.582061
-##       sparse_qr_fit(X, y, weights) 10.907219 10.907219 11.328742 11.328742
-##         uq       max neval
-##   3.738905  3.738905     2
-##  11.750265 11.750265     2</code></pre>
+<p>For sanity, we check that it yields the same results as the other methdos</p>
+<pre class="r"><code>wls_invfit(X, y, weights)</code></pre>
+<pre><code>## Petal.Length  Petal.Width 
+##     1.723813    -3.196153</code></pre>
+</div>
+<div id="benchmarking-with-dense-data" class="section level3">
+<h3>Benchmarking with dense data</h3>
+<p>We will try different combinations of the parameters on several models and compute average time and then do a few plots. We shall do to experiments, one to discover the effect of big <span class="math inline">\(N\)</span> and the other for <span class="math inline">\(P\)</span>. For this section we use the <code>ggplot2</code> awesome plotting library, and <code>ggthemes</code> to make the graphs even more beautiful.</p>
+<pre class="r"><code>library(ggplot2)
+library(ggthemes)</code></pre>
+<div id="the-effect-of-sample-size-n" class="section level4">
+<h4>The effect of sample size N</h4>
+<p>For this test we will fix <span class="math inline">\(p = 9\)</span> and compute for exponentially increasing values of <span class="math inline">\(N\)</span> the effect.</p>
+<p>Ok, so let’s simulate a moderate dense database from a theoretical model. Let’s generate some random data.</p>
+<pre class="r"><code>N &lt;- 1e6 # up to 1,000,000 observations
+P &lt;- 9 # just 9 variables
+# large random dense design matrix ~ 762mb
+set.seed(110104) # reproducibility
+X &lt;- rnorm(N * P) %&gt;% 
+  matrix(ncol = P)
+# random true model
+beta &lt;- rnorm(P) # random coefficients
+sigma &lt;- .01 # error size
+y &lt;- drop(X %*% beta) + rnorm(N, sd = sigma)
+weights &lt;- rep(1, N)</code></pre>
+<pre class="r"><code>Nvalue &lt;- floor(10^seq(1, 6, by = 0.5)) # 10, 31, 100, 316, etc..
+qr_time &lt;- numeric(length(Nvalue))
+inv_time &lt;- numeric(length(Nvalue))
+for (i in seq_along(Nvalue)) {
+  n &lt;- Nvalue[i]
+  t_qr &lt;- microbenchmark(wls_qrfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 10L)
+  t_inv &lt;- microbenchmark(wls_invfit(X[1:n, 1:P], y[1:n], weights[1:n]), times = 10L)
+  qr_time[i] &lt;- mean(t_qr$time)  / 1e9
+  inv_time[i] &lt;- mean(t_inv$time)  / 1e9
+}</code></pre>
+<p>We print the comparison of the methods</p>
+<pre class="r"><code>data.frame(
+  N = scales::comma(Nvalue),
+  QR = paste0(qr_time, &quot;s&quot;),
+  `Full Inversion` = paste0(inv_time, &quot;s&quot;)
+) %&gt;% 
+  knitr::kable(align = &quot;rrr&quot;) # for nice table format in rmarkdown</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">N</th>
+<th align="right">QR</th>
+<th align="right">Full.Inversion</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">10</td>
+<td align="right">0.0001149141s</td>
+<td align="right">0.0001225332s</td>
+</tr>
+<tr class="even">
+<td align="right">31</td>
+<td align="right">0.000177049s</td>
+<td align="right">0.0001717199s</td>
+</tr>
+<tr class="odd">
+<td align="right">100</td>
+<td align="right">0.000215972s</td>
+<td align="right">0.0001322441s</td>
+</tr>
+<tr class="even">
+<td align="right">316</td>
+<td align="right">0.0002542238s</td>
+<td align="right">0.0001595613s</td>
+</tr>
+<tr class="odd">
+<td align="right">1,000</td>
+<td align="right">0.0003511762s</td>
+<td align="right">0.0002225251s</td>
+</tr>
+<tr class="even">
+<td align="right">3,162</td>
+<td align="right">0.0005416065s</td>
+<td align="right">0.0004338382s</td>
+</tr>
+<tr class="odd">
+<td align="right">10,000</td>
+<td align="right">0.001806446s</td>
+<td align="right">0.0012192458s</td>
+</tr>
+<tr class="even">
+<td align="right">31,622</td>
+<td align="right">0.0075573779s</td>
+<td align="right">0.0041717482s</td>
+</tr>
+<tr class="odd">
+<td align="right">100,000</td>
+<td align="right">0.0238063853s</td>
+<td align="right">0.0139651446s</td>
+</tr>
+<tr class="even">
+<td align="right">316,227</td>
+<td align="right">0.1245337638s</td>
+<td align="right">0.0543325523s</td>
+</tr>
+<tr class="odd">
+<td align="right">1,000,000</td>
+<td align="right">0.4727067714s</td>
+<td align="right">0.2881384358s</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>plot_data &lt;- data.frame(
+  logN = log(Nvalue, 10),
+  qr_time = qr_time,
+  inv_time = inv_time
+) %&gt;% 
+  gather(method, seconds, -logN)
+ggplot(plot_data, aes(x = logN, y = seconds, colour = method)) +
+  geom_line(size = 1) +
+  scale_colour_discrete(labels = c(&quot;Full Inverse&quot;, &quot;QR&quot;)) + 
+  ggtitle(&quot;Effect of increasing N with P = 9 fixed&quot;) + 
+  theme_calc() </code></pre>
+<p><img src="data:image/png;base64,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" width="672" /> This results are consistent with our theory that said if <span class="math inline">\(N\)</span> is similar to <span class="math inline">\(P\)</span> then computation time should be efficient for the <span class="math inline">\(QR\)</span> method, but as <span class="math inline">\(N &gt;&gt; P\)</span>, the QR algorithm needs twice as much work because it requires the factorization of <span class="math inline">\(X\)</span>.</p>
+<!-- #### (Bonus subsection) Use metaprogramming to make it work just like the lm function of R -->
+<!-- This is an example of **metaprogramming** and will allow us to mimic the behaviour of `lm`. We will also add a default intercept to the model which can be removed writing `-1` just like in `lm`. -->
+<!-- ```{r, warning=FALSE} -->
+<!-- wls <- function(model, data, weights = rep(1, nrow(data)), method = c("qr", "inverse")) { -->
+<!--   # some input validation -->
+<!--   stopifnot(is.numeric(weights), length(weights) == nrow(data)) -->
+<!--   # make model a formula -->
+<!--   model <- as.formula(model) -->
+<!--   lhs <-  as.character(model)[[2]] # left side of formula -->
+<!--   rhs <-  as.character(model)[[3]] # right side of formula -->
+<!--   # response variable y -->
+<!--   y <- data[ ,lhs] -->
+<!--   # create design matrix X -->
+<!--   if (rhs == ".") { # case 1: all formulas -->
+<!--     X <- data[ ,-match(lhs, names(data))] # just remove y -->
+<!--   } else { -->
+<!--     remove_intercept <- grepl("-(.*?)1", rhs) # do we need intercept? -->
+<!--     if (remove_intercept) { -->
+<!--       rhs <- gsub("[ ]+(.*?)1", "", rhs) # get rid of intercept indication -->
+<!--       var_names <- strsplit(rhs, "[ ]+[\\+][ ]+")[[1]] # regexps are awesome! -->
+<!--       print(var_names) -->
+<!--       X <- data[ ,names(data) %in% var_names, drop = FALSE]  -->
+<!--     } else { -->
+<!--       var_names <- strsplit(rhs, "[ ]+[\\+][ ]+")[[1]] # regexps are awesome! -->
+<!--       X <- data.frame( -->
+<!--         `(Intercept)` = 1, -->
+<!--         data[ ,names(data) %in% var_names, drop = FALSE], -->
+<!--         check.names = FALSE -->
+<!--       ) -->
+<!--     } -->
+<!--   } -->
+<!--   # run the model  -->
+<!--   beta <- switch( -->
+<!--     method, -->
+<!--     "qr" = wls_qrfit(X, y, weights), -->
+<!--     "inverse" =  wls_invfit(X, y, weights) -->
+<!--   ) -->
+<!--   names(beta) <- names(X) -->
+<!--   # output -->
+<!--   out <- list( -->
+<!--     model = model, -->
+<!--     coefficients = beta -->
+<!--   ) -->
+<!--   out -->
+<!-- } -->
+<!-- ``` -->
+<!-- With intercept: -->
+<!-- ```{r} -->
+<!-- wls(Sepal.Width ~ Petal.Length + Petal.Width, weights = rep(1/nrow(iris), nrow(iris)), data = iris) -->
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- lm(Sepal.Width ~ Petal.Length + Petal.Width, weights = rep(1/nrow(iris), nrow(iris)), data = iris) -->
+<!-- ``` -->
+<!-- No intercept: -->
+<!-- ```{r} -->
+<!-- wls(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris) -->
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- lm(Sepal.Width ~ Petal.Length + Petal.Width - 1, data = iris) -->
+<!-- ``` -->
+<!-- ### (D) The Sparse World -->
+<!-- A *sparse matrix* $A$ is a matrix in which most elements are zero. A consequence is that traditional algorithms waste too much energy with unnecessary loops when handling these matrices. These matrices are usually represented more efficially as lists, each entry containing a row, a column, and a value. For example: -->
+<!-- $$ -->
+<!-- \begin{bmatrix} -->
+<!-- 0 & 0 & 0 & 0 & 9 & 0 \\ -->
+<!-- 0 & 9 & 0 & 0 & 0 & 0 \\ -->
+<!-- 4 & 0 & 0 & 2 & 0 & 0 \\ -->
+<!-- 0 & 0 & 0 & 0 & 0 & 5 \\ -->
+<!-- 0 & 0 & 2 & 0 & 0 & 0  -->
+<!-- \end{bmatrix} -->
+<!-- $$ -->
+<!-- becomes -->
+<!-- | *nrows* | *ncolumns* | *nvalues* | -->
+<!-- | :--: |  :-----: | :-----: | -->
+<!-- |   5   |     6    |    6    | -->
+<!-- | *row* | *column* | *value* | -->
+<!-- | :---: |  :-----: | :-----: | -->
+<!-- |   1   |     5    |    9    | -->
+<!-- |   2   |     2    |    8    | -->
+<!-- |   3   |     1    |    4    | -->
+<!-- |   3   |     3    |    2    | -->
+<!-- |   4   |     6    |    5    | -->
+<!-- |   5   |     3    |    2    | -->
+<!-- Algorithms for sparse matrices adapt to this type of internal data representation. If a sparse matrix algorithm is used with a dense matrix, then it will less efficient, but they are typically much faster for sparse matrices. -->
+<!-- In R, the library `Matrix` handles sparse matrices, having a special S4 class. For the uninitiated is R's formal S4 classes, the thing to remember is that implication of having a class is that multiplication, summation, and many function can automatically identify if the input matrix is of this class, and then call appropriate corresponding algorithm. -->
+<!-- Let's save our sample sparse matrix in a variable `X`: -->
+<!-- ```{r, cache=FALSE} -->
+<!-- library(Matrix) -->
+<!-- N <- 1e4 -->
+<!-- d <- 1e3 -->
+<!-- X <- Matrix( -->
+<!--   data = rnorm(N * d) * rbinom(N * d, 1, 0.01), -->
+<!--   nrow = N, -->
+<!--   sparse = TRUE -->
+<!-- ) -->
+<!-- X[1:5, 1:10] # sample view of X -->
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- str(X) -->
+<!-- ``` -->
+<!-- We see above that the rows and columns are stores in the fields `i` and `p` of this object; the values are stored in the property `x`. -->
+<!-- **Methods for sparse matrices**. We will now write a few methods for sparse matrices. Basically, we will give the sparse versions of the previous methods. -->
+<!-- ```{r, cache=FALSE} -->
+<!-- sparse_qr_fit <- function(sparseX, y, weights) { -->
+<!--   stopifnot(inherits(sparseX, "sparseMatrix")) # check if X is sparse -->
+<!--   N <- nrow(sparseX) -->
+<!--   # 1: Adjust for weights -->
+<!--   Xtilde <- sparseX * sqrt(weights) # Xtilde is sparse! -->
+<!--   ytilde <- y * sqrt(weights) -->
+<!--   # 2: (Q-less) QR decomposition -->
+<!--   qrdecomp <- qr(Xtilde) -->
+<!--   R <- qrR(qrdecomp) # base qr fun is odd, qr.R recovers R from the odd form of qr -->
+<!--   # 3: Get RHS of linear system -->
+<!--   b <- crossprod(Xtilde, ytilde) -->
+<!--   # 4. Solve Step 1 of system -->
+<!--   z <- solve(t(R), b) # formal class system signature chooses forward solve automatically -->
+<!--   # 5. Solve Step 2 of system -->
+<!--   beta <- solve(R, z) # formal class system signature chooses backward solve automatically -->
+<!--   # Output -->
+<!--   as.numeric(beta) -->
+<!-- } -->
+<!-- ``` -->
+<!-- ```{r, cache=TRUE} -->
+<!-- beta <- rnorm(d) -->
+<!-- err <- rnorm(N, 0, .01) -->
+<!-- y <- X %*% beta + err -->
+<!-- weights <- rep(1, N) -->
+<!-- microbenchmark( -->
+<!--   wls_qrfit(as.matrix(X), y, weights), -->
+<!--   sparse_qr_fit(X, y, weights), -->
+<!--   times = 2L -->
+<!-- ) -->
+<!-- ``` -->
+</div>
 </div>
 </div>
 

@@ -1,0 +1,138 @@
+---
+title: "Stats Models for Big Data SDS385"
+subtitle: 'Solutions 05: Mauricio Garcia Tec'
+output:
+  html_document: 
+    theme: readable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+```
+
+$$
+\DeclareMathOperator{\prox}{prox}
+\DeclareMathOperator*{\argmin}{argmin\;}
+\newcommand{\semi}{\hspace{0.05em};\hspace{0.1em}}
+$$
+
+### Part I : Proximal Operators
+
+**Definition 1**. Given a (regularization) parameter $\gamma > 0$, the **Moreau envelope** $E_\gamma f$ of a convex function $f$ is defined bu the rule
+$$
+(E_\gamma f)(x) = \min_z \left\{ f(z) + \frac{1}{2\gamma}\lVert x - z \rVert^2 \right\}.
+$$
+We note that $E_\gamma f(x) \leq f(x)$.
+
+**Definition 2**. Given a (regularization) parameter $\gamma > 0$, the **proximal operator** $\displaystyle\prox_\gamma f$ of a convex function $f$ is defined bu the rule
+$$
+(\prox_\gamma f)(x) = \argmin_z \left\{ f(z) + \frac{1}{2\gamma}\lVert x - z \rVert^2 \right\}.
+$$
+
+#### (A)
+
+We consider a local linear aproximation to $f$ at $x0$ and compute and derive the proximal operator. Let
+$$
+\hat{f}(x \semi x_0) = f(x_0) + (x - x_0)^\top \nabla f(x_0).
+$$
+Let us assume both $x$ and $x_0$ are fixed and let us consider the auxiliary function
+$$
+g(z) = f(x_0) + (z - x_0)^\top \nabla f(x_0) + \frac{1}{2\gamma}\lVert z - x \rVert^2,
+$$
+This is a quadratic polynomial function on $z$ with positive coefficients. To minimize it, we only need to find $z^*$ satisfying the first-order condition $\nabla g(z^*) = 0$. We start by calculating
+$$
+\nabla g (z) = \nabla f (x_0) + \frac{1}{\gamma} \left( z  - x\right).
+$$
+Equating the gradient to zero we conclude that $z^*$ must satisfy
+$$
+0 = \nabla f(x_0) + \frac{1}{\gamma}(z^* - x_0).
+$$
+and thus
+$$
+\prox_\gamma \hat{f}(x \semi x_0) = x - \gamma \nabla f(x_0). 
+$$
+
+This means that if we approximate $f$ by its first-order Taylor approximation, then the proximal operator will return a gradient descent update with step size $\gamma$. 
+
+#### (B)
+
+We now consider the case when we want to find the proximal gradient operator of a quadratic function 
+$$
+l(x) = \frac{1}{2} x^\top P x - q^\top x + r.
+$$
+Again we consider an auxiliary function $g$ and regroup the quadratic and linear terms from the resulting penalized expression
+$$
+\begin{aligned}
+g(z) & = \frac{1}{2} z^\top P z - q^\top z + r + \frac{1}{2\gamma}\lVert z - x \rVert^2 \\
+& = \frac{1}{2} z^\top P z - q^\top z + r + \frac{1}{2\gamma}\left( z^\top z - 2x^\top z + x^\top x \right) \\
+& = \frac{1}{2} z^\top \left(P + \frac{1}{\gamma}I\right) z - \left(q + \frac{1}{\gamma}x\right)^\top z + r + \frac{1}{2\gamma} x^\top x.
+\end{aligned}
+$$
+This again is a quadratic form and we can obtain its minumum with a similar procedure as before. More generally, a convex quadratic function of the form
+$$
+\frac{1}{2}x^\top A x + b^\top + c
+$$
+attains its minimum at $x^\top = - A^{-1}b$. Thus, we may conclude that
+$$
+\prox_\gamma l(x) = \left(P + \frac{1}{\gamma}I\right)^{-1} \left(q + \frac{1}{\gamma}x\right),
+$$
+or equivalently,
+$$
+\prox_{1 / \tau} l(x) = \left(P + \tau I\right)^{-1} \left(q + \tau x \right),
+$$
+
+***Gaussian Example***. Suppose we have a model
+$$
+y \mid x \sim N(Ax, \Omega^{-1}),
+$$
+then the associated negative loglikelihood of the model is
+$$
+\begin{aligned}
+l(x\semi A, \Omega^{-1} , y) &= \log\left\{ (2\pi)^{-n/2} \lvert \Omega \rvert^{1/2} \exp\left\{ \frac{1}{2}(y - Ax)^\top \Omega (y - Ax) \right\} \right\} \\
+ &=  \frac{1}{2} (y - Ax)^\top \Omega (y - Ax) + \frac{1}{2}\log \lvert \Omega \rvert -\frac{n}{2} \log{2\pi} \\ 
+ & =  \frac{1}{2} x^\top (A^\top \Omega A) x  - (y^\top A) x + y^\top\Omega y + \frac{1}{2}\log \lvert \Omega \rvert - \frac{n}{2} \log{2\pi}.
+\end{aligned}
+$$
+This means that we may apply our previous result taking
+$$
+\begin{aligned}
+P & = A^\top \Omega A \\
+q & = A^\top \Omega y \\
+r & = y^\top\Omega y + \frac{1}{2}\log \lvert \Omega \rvert - \frac{n}{2} \log{2\pi},
+\end{aligned}
+$$
+and conclude that
+$$
+\prox_{1 / \tau} = (A^\top \Omega A + \tau I)^{-1} (A^\top \Omega y + \tau x)
+$$
+
+#### (C)
+
+Let now $\phi(x) = \tau \lVert x \rVert_1$, we want to study the proximal operator of this function in terms of the thresholding opreator.
+
+As usual, we start with the auxiliary function
+$$
+\begin{aligned}
+g(z) &  = \lVert z \rVert_1 + \frac{1}{2\gamma}\lVert x - z\rVert^2 \\
+     & = \ \sum_i \lvert z_i \rvert + \frac{1}{2\gamma}\sum_i (x_i - z_i)^2 \\
+     & = \frac{1}{\gamma} \sum_i \left\{ \gamma \lvert z_i \rvert + \frac{1}{2} (x_i - z_i)^2 \right\}.
+\end{aligned}
+$$
+The last expression makes evident that $g$ is the sum of "unidimensional" subproblems which must be minimized individually to minimize $g$. We conclude
+$$
+\prox_\gamma \phi(x) = \frac{1}{\gamma} \sum_i S_{\gamma}(x_i)
+$$
+where $S_\gamma$ is the soft thresholding operator we studied in the previous set of exercises, defined as
+$$
+S_\gamma(y) = \argmin_\theta \frac{1}{2}(y - \theta)^2 + \lambda \lvert \theta \rvert.
+$$
+Moreover, since we also proved previously that 
+$$
+S_\gamma(y) = \mathrm{sign}(y) (\lvert y \rvert - \gamma)_+,
+$$
+we obtain a refined expression
+$$
+\prox_\gamma \phi(x) = \frac{1}{\gamma} \sum_i \mathrm{sign}(x_i) (\lvert x_i \rvert - \gamma)_+,
+$$

@@ -1,0 +1,190 @@
+---
+output: 
+  html_document:
+    theme: readable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(cache = FALSE)
+```
+
+$$
+\DeclareMathOperator*{\argmin}{argmin\;}
+$$
+
+
+# Solutions 05b
+
+## The Lasso
+
+### (A)
+<strong>
+Download the data on diabetes progression in 442 adults from the Data folder on the class website. Fit the lasso model across a range of $\lambda$ values.
+
+</strong>
+
+```{r}
+library(readr)
+library(glmnet)
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+X <- url("https://raw.githubusercontent.com/jgscott/SDS385/master/data/diabetesX.csv") %>% 
+  read_csv() %>% 
+  data.matrix()
+y <- url("https://raw.githubusercontent.com/jgscott/SDS385/master/data/diabetesY.csv") %>% 
+  read_csv(col_names = FALSE) %>% 
+  data.matrix() %>% 
+  drop()
+```
+
+```{r}
+nlambda <- 100
+lambda_seq <- exp(seq(-4, 4, length.out = nlambda))
+fit <- glmnet(X, y, lambda = lambda_seq)
+```
+
+The following plot shows the coefficients shrinkage as $\lambda$ increases.
+```{r}
+plot(fit, xvar = "lambda")
+```
+
+Now we track the mean square error
+
+```{r}
+mse <- sapply(seq_along(fit$lambda), function(i) mean((y - fit$a0[i] - X %*% fit$beta[ ,i])^2)) 
+plot(log(fit$lambda), mse, type = "l", col = "blue", xlab = expression(log(lambda)), ylab = "")
+title(expression("Training MSE as function of " ~ lambda))
+```
+
+
+### (B) Cross-Validation
+
+```{r}
+set.seed(1)
+N <- nrow(X)
+ratio <- 0.8
+train_idx <-  sample(1:N, size = floor(ratio * N))
+X_train <- X[train_idx, ]
+X_test <- X[-train_idx, ]
+y_train <- y[train_idx]
+y_test <- y[-train_idx]
+```
+
+```{r}
+# Number of folds for cross-validation
+nfolds <- 10
+
+# Create 10 equal size folds as a list of validation indexes
+folds <- split(sample(N), cut(1:N, breaks = nfolds, labels = FALSE))
+
+# Number of folds for cross-validation
+nfolds <- 10
+size <- length(train_idx)
+
+# Create 10 equal size folds as a list of validation indexes
+folds <- split(sample(size, replace = TRUE), cut(1:size, breaks = nfolds, labels = FALSE))
+
+# Run cross-validation
+mse_data <- data.frame()
+for (k in 1:nfolds) {
+  idk <- folds[[k]]
+  fitk <- glmnet(X_train[-idk, ], y_train[-idk], lambda = lambda_seq)
+  mse_cv <- sapply(1:nlambda, function(i) {
+    mean((y_train[idk] - predict(fitk, X_train[idk, ], s = lambda_seq[i]))^2)
+  }) 
+  mse_data <- rbind(mse_data, data.frame(
+    fold = k,
+    lambda = lambda_seq,
+    mse_cv = mse_cv
+  ))
+}
+```
+
+```{r}
+mse_data_summary <- mse_data %>% 
+  mutate(loglambda = log(lambda)) %>%
+  group_by(lambda, loglambda) %>% 
+  summarize(
+    mean_mse = mean(mse_cv), 
+    sd_mse = sd(mse_cv) / sqrt(nfolds), 
+    upper1 = mean_mse + sd_mse,
+    lower1 = mean_mse - sd_mse
+  )
+best_mse <- min(mse_data_summary$mean_mse)
+best_lambda <- mse_data_summary$lambda[which.min(mse_data_summary$mean_mse)]
+ggplot(mse_data_summary, aes(x = loglambda, y = mean_mse)) + 
+  geom_line(colour = "blue", size = 1) +
+  geom_ribbon(aes(ymin = upper1, ymax = lower1), alpha = 0.3) +
+  geom_vline(aes(xintercept = log(best_lambda)), col = "red", linetype = "dashed") +
+  ggtitle(expression("Cross-validated MSE and best fit" ~ lambda)) +
+  xlab(expression(log(lambda))) + ylab(expression(hat('mse'[lambda])))
+```
+
+```{r}
+best_lambda
+```
+
+```{r}
+best_mse
+```
+
+We finally report the Out-of-Sample estimated error:
+
+```{r}
+cv_postfit <- glmnet(X_test, y_test, lambda = best_lambda)
+moose_estim <- mean((y_test - predict(cv_postfit, X_test))^2)
+moose_estim
+```
+
+Number of non-zero coefficients:
+
+```{r}
+cv_postfit$beta 
+```
+
+```{r}
+sum(cv_postfit$beta != 0)
+```
+
+
+Comparison with the package function
+
+```{r}
+fit_cv <- cv.glmnet(X_train, y_train, family = "gaussian", lambda = lambda_seq)
+plot(fit_cv)
+```
+```{r}
+min(fit_cv$lambda.min)
+```
+
+### (C)
+
+We compute the Mallow's Cp that we will compare the error estimates in-sample and cross-validated.
+
+```{r}
+fit <- glmnet(X, y, lambda = lambda_seq)
+mse_data_summary <- mse_data_summary %>%
+  ungroup() %>% 
+  mutate(in_sample = sapply(seq_along(lambda_seq), function(i) {
+    mean((y - predict(fit, X, s = lambda_seq[i]))^2)
+  })) %>% 
+  mutate(Cp = sapply(seq_along(lambda_seq), function(i) {
+    err <- y - predict(fit, X, s = lambda_seq[i])
+    mean(err^2) + 2 * fit$df[nlambda - i + 1] * var(err) / N
+  }))
+mse_condensed <- mse_data_summary %>% 
+  select(lambda, in_sample, Cp, mean_mse) %>% 
+  rename(`In-Sample MSE` = in_sample, `Cross-Validated` = mean_mse) %>% 
+  gather(Method, Estimation, -lambda)
+ggplot(mse_condensed, aes(x = log(lambda), y = Estimation, colour = Method)) + 
+  geom_line(size = 1) +
+  xlab(expression(log(lambda))) + ggtitle("Different out-of-sample error estimations") +
+  theme_bw()
+  
+```
+

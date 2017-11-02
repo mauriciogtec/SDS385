@@ -146,12 +146,90 @@ plot_ly() %>%
 
 ```{r}
 lambda <-  0.3
-y <-  seq(-1, 1, length.out = 100)
+y <-  seq(-1, 1, length.out = 1000)
 soft <-  sign(y) * pmax(abs(y) - lambda, 0) 
 hard <- y * (y > lambda)  
 plot(y, soft, type = "l", col = "red", ylim = c(-1, 1))
 lines(y, hard, col = "blue")
 legend("bottomright", legend = c("soft", "hard"), col = c("red", "blue"), lty = 1)
 title("Soft vs Hard Thresholding with lambda = 0.3")
+```
+
+### (A)
+<strong>
+Here’s a simple toy example to illustrate how soft thresholding can be used to enforce sparsity in statistical models. Suppose we observe data from the following statistical model: 
+$$
+y_i \mid \theta_i \sim N(\theta_i, \sigma_i^2)
+$$
+Now suppose we believe that a lot of the $\theta_i$’s are zero. Consider an estimator for each $\theta_i$ of the form
+$$
+\hat{\theta}(y_i) = S_{\lambda\sigma_i^2}(y_i).
+$$
+
+1. Choose some sparse vector $\theta$ and the corresponding $\sigma^2_i$.
+2. Simulate one data point for each $\theta_i$,
+3. Compute the estimator accross a discrete grid of different $\lambda$ values and compare with $\theta$.
+4. Plot the mean-squared error of your estimate as a function of $\lambda$.
+
+</strong>
+
+This is the sparse vector we will choose.
+
+```{r}
+set.seed(110104)
+n <- 100
+# About half of them will be sparse
+mask <- rbinom(n, 1, c(0.5))
+pretheta <- seq(-3, 3, length.out = n)
+theta <-  pretheta * mask
+```
+
+We now simulate random observation, all with the same unit variance
+```{r}
+sigma <- 1
+y <- sapply(theta, function(t) rnorm(1, mean = t, sd = sigma))
+```
+
+Now for a grid of $\lambda$ values and each $y$.
+
+```{r}
+lambda <- seq(0, 3, length.out = 8)
+grid <- outer(y, lambda, function(y, lambda) sign(y) * pmax(abs(y) - lambda, 0))
+```
+
+Plot results
+```{r}
+par(mfrow = c(2,4))
+for (j in 1:8) {
+  plot(theta, grid[ ,j], pch = 21, bg = "blue", xlab = expression(theta), ylab = expression(hat(theta)), xlim = c(-3, 3), ylim = c(-3, 3))
+  abline(a = 0, b = 1, col = "red")
+  title(paste(expression(lambda), "=", round(lambda[j], 2)))
+}
+```
+
+We now want to see the MSE as a function of $\lambda$ and try different levels of sparsity.
+
+```{r}
+density <- seq(0.1, 0.8, .1)
+plot_data <- data.frame()
+for (i in 1:8) {
+  mask <- rbinom(n, 1, density[i])
+  theta <-  pretheta * mask 
+  y <- sapply(theta, function(t) rnorm(1, mean = t, sd = sigma))
+  mse <- sapply(lambda, function(lambda) mean((theta - sign(y) * pmax(abs(y) - lambda, 0))^2))
+  plot_data <- rbind(plot_data, data.frame(
+    lambda = lambda,
+    mse = mse,
+    density = density[i] 
+  ))
+}
+```
+
+```{r}
+# Better plotting power
+library(ggplot2)
+ggplot(plot_data, aes(x = lambda, y = mse, group = factor(density), colour = density)) +
+  geom_line() +
+  ggtitle("MSE varying by density") + xlab(expression(lambda))
 ```
 

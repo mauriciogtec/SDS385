@@ -21,5 +21,5 @@ Unfortuntaley, Github is not as friendly with Rmd as it is with Jupyter notebook
 * [`Solution01b`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions01b/Solution01b-SDS385.html)
 * [`Solution02`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions02/Solution02-SDS385.html)
 * [`Solution05a`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions05/Solution05-SDS385.html)
-* [`Solution05b`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions05/Solution05b-SDS385.html)
+* [`Solution05b`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions05/Solution05-SDS385b.html)
 * [`Solution06`](https://mauriciogtec.github.io/SDS385/Exercises/Solutions06/Solution06-SDS385.html)

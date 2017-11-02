@@ -67,7 +67,7 @@ title(expression("Training MSE as function of " ~ lambda))
 ```{r}
 set.seed(1)
 N <- nrow(X)
-ratio <- 0.8
+ratio <- 0.75
 train_idx <-  sample(1:N, size = floor(ratio * N))
 X_train <- X[train_idx, ]
 X_test <- X[-train_idx, ]
@@ -144,12 +144,9 @@ moose_estim
 Number of non-zero coefficients:
 
 ```{r}
-cv_postfit$beta 
-```
-
-```{r}
 sum(cv_postfit$beta != 0)
 ```
+
 
 
 Comparison with the package function

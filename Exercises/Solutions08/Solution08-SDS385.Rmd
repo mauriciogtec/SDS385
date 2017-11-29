@@ -1,0 +1,229 @@
+---
+title: "SDS 385 Stats Models for Big Data"
+subtitle: 'Solutions 8: Mauricio Garcia Tec'
+output:
+  html_document: default
+---
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+```
+
+
+```{r}
+library(tidyverse) # Data handling
+library(knitr) # HTML visualization (for this markdown)
+library(leaflet) # Spatial Maps
+library(sp) # Spatial Data
+```
+
+```{r, cache=TRUE}
+concentration <-  read_csv("https://raw.githubusercontent.com/jgscott/SDS385/master/data/co2.csv")
+kable(head(concentration))
+```
+
+We will use spatial data format
+
+```{r, cache = TRUE}
+spdata <- SpatialPointsDataFrame(concentration[ ,c(2:3)], concentration[ ,4])
+```
+
+We can visualize the data in an interactive map
+
+```{r}
+# maps seem to tolerate up to 20000 points easily
+set.seed(110104)
+plot_sample <- sample(nrow(concentration), 10000)
+```
+
+```{r, cache = TRUE}
+# world map
+pal <- colorNumeric("Spectral", domain = spdata@data$co2avgret)
+leaflet(spdata[plot_sample, ]) %>% 
+  addTiles() %>% 
+  addTiles(group = "OSM (default)") %>% 
+  # addProviderTiles(providers$Stamen.TonerLite, group = "Toner Lite") %>%
+  addCircleMarkers(
+    radius = 3, 
+    stroke = FALSE, 
+    fillOpacity = 1,
+    fillColor = ~pal(co2avgret), 
+    label = ~as.character(co2avgret)
+    ) %>% 
+  addLegend(
+    "bottomleft",
+    values = ~co2avgret,
+    pal = pal)
+```
+
+#### Gaussian convolution
+
+The code uses parallelization, armadillo and Rcpp.
+
+```{r, engine='Rcpp', eval = FALSE}
+#define ARMA_64BIT_WORD 1
+#define _USE_MATH_DEFINES
+#include <omp.h>
+#include <RcppArmadillo.h>
+using namespace Rcpp;
+using namespace arma;
+using namespace std;
+// [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::plugins(cpp11)]] 
+// [[Rcpp::plugins(openmp)]]
+
+// [[Rcpp::export]]
+arma::mat gaussian_filter(arma::mat x, arma::vec z, arma::rowvec bandwidth, int ncores = 1) {
+  // setup
+  omp_set_num_threads(ncores);
+  uword n = x.n_rows, m = bandwidth.n_elem;
+  mat out(n, m, fill::zeros);
+  mat total_weight(n, m, fill::zeros);
+  
+  // constants
+  const rowvec b2 = 2 * pow(bandwidth, 2);
+  
+  #pragma omp parallel for schedule(static) 
+  for (uword i = 0; i < n; i++) {
+    for (uword j = i; j < n; j++) {
+      rowvec w = exp(- sum(square(x.row(i) - x.row(j))) / b2);
+      total_weight.row(i) += w;
+      total_weight.row(j) += w;
+      out.row(i) += w * z(j);
+      out.row(j) += w * z(i);
+    }
+  }
+  out = out / total_weight;
+  
+  return out;
+}
+
+```
+
+We now run the gaussian filter with different bandwidths. We will try 10, 25, and 50. The full process takes about 17 minutes.
+
+```{r, include=FALSE}
+Rcpp::sourceCpp('Solutions08/gaussian_filter.cpp')
+```
+
+
+```{r, cache = TRUE, eval =FALSE}
+x = data.matrix(concentration[ , c(2, 3)])
+z = data.matrix(concentration[ , 4])
+system.time({ 
+  res <- gaussian_filter(x, z, c(5, 10, 25, 50), ncores = 8)
+  saveRDS(res, "Solutions08/res.RDS")
+})
+```
+```{r, include=FALSE}
+res <- readRDS("Solutions08/res.RDS")
+```
+
+
+```{r}
+spdata@data <- cbind(spdata@data, 
+                     smooth5 = res[ ,1],
+                     smooth10 = res[ ,2], 
+                     smooth25 = res[ ,3],
+                     smooth50 = res[ ,4])
+```
+
+We now plot the smoothed results
+
+
+#### b = 5
+
+```{r}
+pal <- colorNumeric("Spectral", domain = spdata@data$co2avgret)
+leaflet(spdata[plot_sample, ]) %>% 
+  addTiles() %>% 
+  addTiles(group = "OSM (default)") %>% 
+  # addProviderTiles(providers$Stamen.TonerLite, group = "Toner Lite") %>%
+  addCircleMarkers(
+    radius = 3, 
+    stroke = FALSE, 
+    fillOpacity = 1,
+    fillColor = ~pal(smooth5), 
+    label = ~as.character(smooth5)
+    ) %>% 
+  addLegend(
+    "bottomleft",
+    values = ~smooth5,
+    pal = pal)
+```
+
+#### b = 10
+
+```{r}
+pal <- colorNumeric("Spectral", domain = spdata@data$co2avgret)
+leaflet(spdata[plot_sample, ]) %>% 
+  addTiles() %>% 
+  addTiles(group = "OSM (default)") %>% 
+  # addProviderTiles(providers$Stamen.TonerLite, group = "Toner Lite") %>%
+  addCircleMarkers(
+    radius = 3, 
+    stroke = FALSE, 
+    fillOpacity = 1,
+    fillColor = ~pal(smooth10), 
+    label = ~as.character(smooth10)
+    ) %>% 
+  addLegend(
+    "bottomleft",
+    values = ~smooth10,
+    pal = pal)
+```
+
+#### b = 25
+
+```{r}
+pal <- colorNumeric("Spectral", domain = spdata@data$co2avgret)
+leaflet(spdata[plot_sample, ]) %>% 
+  addTiles() %>% 
+  addTiles(group = "OSM (default)") %>% 
+  # addProviderTiles(providers$Stamen.TonerLite, group = "Toner Lite") %>%
+  addCircleMarkers(
+    radius = 3, 
+    stroke = FALSE, 
+    fillOpacity = 1,
+    fillColor = ~pal(smooth25), 
+    label = ~as.character(smooth25)
+    ) %>% 
+  addLegend(
+    "bottomleft",
+    values = ~smooth25,
+    pal = pal)
+```
+
+
+#### b = 50
+
+```{r}
+pal <- colorNumeric("Spectral", domain = spdata@data$co2avgret)
+leaflet(spdata[plot_sample, ]) %>% 
+  addTiles() %>% 
+  addTiles(group = "OSM (default)") %>% 
+  # addProviderTiles(providers$Stamen.TonerLite, group = "Toner Lite") %>%
+  addCircleMarkers(
+    radius = 3, 
+    stroke = FALSE, 
+    fillOpacity = 1,
+    fillColor = ~pal(smooth50), 
+    label = ~as.character(smooth50)
+    ) %>% 
+  addLegend(
+    "bottomleft",
+    values = ~smooth50,
+    pal = pal)
+```
+
+-------------------
+
+```{r, cache=TRUE}
+fmri <-  read_csv("https://raw.githubusercontent.com/jgscott/SDS385/master/data/fmri_z.csv") %>% 
+  data.matrix()
+image(fmri, col  = gray(seq(0, 1, .01)))
+```
+
+
